@@ -129,16 +129,20 @@ void bind_arithmetic_operations(py::module_& math) {
 void bind_sums_products_differences(py::module_& math) {
     math.def("prod", py::overload_cast<const NPUArray&, int64_t, bool, std::optional<py::dtype>>(&Prod), py::arg("a"),
              py::arg("axis"), py::arg("keepdims"), py::arg("dtype") = py::none());
-    math.def("prod", py::overload_cast<const NPUArray&>(&Prod), py::arg("a"));
+    math.def("prod", py::overload_cast<const NPUArray&, std::optional<py::dtype>>(&Prod), py::arg("a"),
+             py::arg("dtype") = py::none());
     math.def("sum", py::overload_cast<const NPUArray&, int64_t, bool, std::optional<py::dtype>>(&Sum), py::arg("a"),
              py::arg("axis"), py::arg("keepdims"), py::arg("dtype") = py::none());
-    math.def("sum", py::overload_cast<const NPUArray&>(&Sum), py::arg("a"));
+    math.def("sum", py::overload_cast<const NPUArray&, std::optional<py::dtype>>(&Sum), py::arg("a"),
+             py::arg("dtype") = py::none());
     math.def("nanprod", py::overload_cast<const NPUArray&, int64_t, bool, std::optional<py::dtype>>(&Nanprod),
              py::arg("a"), py::arg("axis"), py::arg("keepdims"), py::arg("dtype") = py::none());
-    math.def("nanprod", py::overload_cast<const NPUArray&>(&Nanprod), py::arg("a"));
+    math.def("nanprod", py::overload_cast<const NPUArray&, std::optional<py::dtype>>(&Nanprod), py::arg("a"),
+             py::arg("dtype") = py::none());
     math.def("nansum", py::overload_cast<const NPUArray&, int64_t, bool, std::optional<py::dtype>>(&Nansum),
              py::arg("a"), py::arg("axis"), py::arg("keepdims"), py::arg("dtype") = py::none());
-    math.def("nansum", py::overload_cast<const NPUArray&>(&Nansum), py::arg("a"));
+    math.def("nansum", py::overload_cast<const NPUArray&, std::optional<py::dtype>>(&Nansum), py::arg("a"),
+             py::arg("dtype") = py::none());
     math.def("cumprod", &Cumprod, py::arg("a"), py::arg("axis"), py::arg("dtype") = py::none());
     math.def("cumsum", &Cumsum, py::arg("a"), py::arg("axis"), py::arg("dtype") = py::none());
     math.def("nancumprod", &Nancumprod, py::arg("a"), py::arg("axis"), py::arg("dtype") = py::none());

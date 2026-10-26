@@ -44,11 +44,10 @@ def test_sum_basic(xp, dtype):
     return xp.sum(a, axis=0, keepdims=False)
 
 
-@pytest.mark.xfail(
-    reason="[FIXABLE] sum uses aclnnFlatten which does not support float64", strict=True
-)
-@testing.for_dtypes([numpy.float32])
-def test_sum_axis_none_xfail(xp, dtype):
+@testing.for_dtypes([numpy.float32, numpy.float64])
+@testing.numpy_asnumpy_allclose(atol=1e-5, rtol=1e-5)
+def test_sum_axis_none_basic(xp, dtype):
+    """全局归约（axis=None）返回带 dtype 的 NumPy 标量（原 xfail：aclnnFlatten 不支持 float64）"""
     a = _create_array(xp, [1.0, 2.0], dtype)
     return xp.sum(a)
 

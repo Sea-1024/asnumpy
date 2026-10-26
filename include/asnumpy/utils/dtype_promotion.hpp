@@ -41,6 +41,12 @@ aclDataType PromoteUnaryFloating(aclDataType in);
  */
 aclDataType PromoteBinaryFloating(aclDataType a, aclDataType b);
 
+/**
+ * NumPy reduction accumulate dtype for sum/prod/cumsum/...: bool/int8-int64
+ * -> int64, uint8-uint64 -> uint64, floating/complex unchanged.
+ */
+aclDataType PromoteReduction(aclDataType in);
+
 /** Cast device array to target ACL dtype via aclnnCast (no-op copy when already matching). */
 NPUArray CastToDtype(const NPUArray& input, aclDataType targetDtype);
 

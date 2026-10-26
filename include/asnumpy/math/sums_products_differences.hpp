@@ -26,16 +26,16 @@
 
 namespace asnumpy {
 NPUArray Prod(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
-double Prod(const NPUArray& a);
+py::object Prod(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Sum(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
-double Sum(const NPUArray& a);
+py::object Sum(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Nanprod(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
-double Nanprod(const NPUArray& a);
+py::object Nanprod(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Nansum(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
-double Nansum(const NPUArray& a);
+py::object Nansum(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Cumprod(const NPUArray& a, int64_t axis, std::optional<py::dtype> dtype = std::nullopt);
 

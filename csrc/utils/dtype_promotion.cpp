@@ -68,6 +68,24 @@ aclDataType PromoteBinaryFloating(aclDataType a, aclDataType b) {
     return FloatingRank(left) >= FloatingRank(right) ? left : right;
 }
 
+aclDataType PromoteReduction(aclDataType in) {
+    switch (in) {
+    case ACL_BOOL:
+    case ACL_INT8:
+    case ACL_INT16:
+    case ACL_INT32:
+    case ACL_INT64:
+        return ACL_INT64;
+    case ACL_UINT8:
+    case ACL_UINT16:
+    case ACL_UINT32:
+    case ACL_UINT64:
+        return ACL_UINT64;
+    default:
+        return in;
+    }
+}
+
 NPUArray CastToDtype(const NPUArray& input, aclDataType targetDtype) {
     LOG_DEBUG("aclnnCast start: input_shape={}, aclDtype={}, targetDtype={}", detail::FormatShape(input.shape),
               AclDtypeName(input.aclDtype), AclDtypeName(targetDtype));

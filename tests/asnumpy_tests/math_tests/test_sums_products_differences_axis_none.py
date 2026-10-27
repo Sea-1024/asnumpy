@@ -1,3 +1,19 @@
+# *****************************************************************************
+# Copyright (c) 2025 AISS Group at Harbin Institute of Technology. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# *****************************************************************************
+
 """全局归约（axis=None）的 NumPy 契约测试（dtype 提升、标量 dtype）。"""
 
 import numpy
@@ -94,6 +110,22 @@ def test_nansum_axis_none_integer_contract(xp, dtype):
     return xp.nansum(a)
 
 
+@testing.for_dtypes([numpy.int64])
+@testing.numpy_asnumpy_allclose()
+def test_nansum_axis_none_explicit_int_dtype(xp, dtype):
+    """NaN 清理先于 accumulate cast：float 输入 + 显式 int dtype 时 NaN 计为 0"""
+    a = _create_array(xp, [[1.0, numpy.nan], [2.0, 3.0]], numpy.float32)
+    return xp.nansum(a, dtype=dtype)
+
+
+@testing.for_dtypes([numpy.int64])
+@testing.numpy_asnumpy_allclose()
+def test_nanprod_axis_none_explicit_int_dtype(xp, dtype):
+    """NaN 清理先于 accumulate cast：float 输入 + 显式 int dtype 时 NaN 计为 1"""
+    a = _create_array(xp, [[1.0, numpy.nan], [2.0, 3.0]], numpy.float32)
+    return xp.nanprod(a, dtype=dtype)
+
+
 # ---------------------------------------------------------------------------
 # prod / nanprod（全局标量）
 # ---------------------------------------------------------------------------
@@ -102,7 +134,8 @@ def test_nansum_axis_none_integer_contract(xp, dtype):
 @testing.for_dtypes([numpy.bool_, numpy.int8, numpy.int64])
 @testing.numpy_asnumpy_allclose()
 def test_prod_axis_none_signed_contract(xp, dtype):
-    a = _create_array(xp, [[2, 3], 1], dtype)
+    # prod=125000：int8/int16 若不提升会回绕，暴露 accumulate dtype 契约
+    a = _create_array(xp, [[100, 100], [50, 25]], dtype)
     return xp.prod(a)
 
 

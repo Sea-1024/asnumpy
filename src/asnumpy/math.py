@@ -475,7 +475,7 @@ def prod(
     axis: AxisOptional = None,
     keepdims: bool = False,
     dtype: DTypeLike = None,
-) -> ndarray | float:
+) -> ndarray | np.generic:
     if axis is None:
         return _prod(a, _convert_dtype(dtype))  # type: ignore[no-any-return]
     return ndarray(_prod(a, axis, keepdims, _convert_dtype(dtype)))
@@ -486,7 +486,7 @@ def sum(
     axis: AxisOptional = None,
     keepdims: bool = False,
     dtype: DTypeLike = None,
-) -> ndarray | float:
+) -> ndarray | np.generic:
     if axis is None:
         return _sum(a, _convert_dtype(dtype))  # type: ignore[no-any-return]
     return ndarray(_sum(a, axis, keepdims, _convert_dtype(dtype)))
@@ -497,7 +497,7 @@ def nanprod(
     axis: AxisOptional = None,
     keepdims: bool = False,
     dtype: DTypeLike = None,
-) -> ndarray | float:
+) -> ndarray | np.generic:
     if axis is None:
         return _nanprod(a, _convert_dtype(dtype))  # type: ignore[no-any-return]
     return ndarray(_nanprod(a, axis, keepdims, _convert_dtype(dtype)))
@@ -508,7 +508,7 @@ def nansum(
     axis: AxisOptional = None,
     keepdims: bool = False,
     dtype: DTypeLike = None,
-) -> ndarray | float:
+) -> ndarray | np.generic:
     if axis is None:
         return _nansum(a, _convert_dtype(dtype))  # type: ignore[no-any-return]
     return ndarray(_nansum(a, axis, keepdims, _convert_dtype(dtype)))

@@ -17,6 +17,7 @@
 #pragma once
 
 #include <acl/acl.h>
+#include <aclnn/aclnn_base.h>
 #include <cstdint>
 #include <utility>
 
@@ -78,6 +79,47 @@ class AclWorkspace {
   private:
     void* ptr_ = nullptr;
     uint64_t size_ = 0;
+};
+
+/**
+ * @brief RAII guard for aclIntArray handles
+ *
+ * Destroys the handle on scope exit even when op checks (ACLNN_CHECK / ACL_RT_CHECK) throw,
+ * so error paths no longer leak the descriptor.
+ */
+class AclIntArrayGuard {
+  public:
+    explicit AclIntArrayGuard(aclIntArray* ptr) noexcept : ptr_(ptr) {}
+    ~AclIntArrayGuard() { aclDestroyIntArray(ptr_); }
+
+    // Disable copy and move
+    AclIntArrayGuard(const AclIntArrayGuard&) = delete;
+    AclIntArrayGuard& operator=(const AclIntArrayGuard&) = delete;
+
+    aclIntArray* get() const noexcept { return ptr_; }
+
+  private:
+    aclIntArray* ptr_;
+};
+
+/**
+ * @brief RAII guard for aclScalar handles
+ *
+ * Destroys the handle on scope exit even when op checks (ACLNN_CHECK / ACL_RT_CHECK) throw.
+ */
+class AclScalarGuard {
+  public:
+    explicit AclScalarGuard(aclScalar* ptr) noexcept : ptr_(ptr) {}
+    ~AclScalarGuard() { aclDestroyScalar(ptr_); }
+
+    // Disable copy and move
+    AclScalarGuard(const AclScalarGuard&) = delete;
+    AclScalarGuard& operator=(const AclScalarGuard&) = delete;
+
+    aclScalar* get() const noexcept { return ptr_; }
+
+  private:
+    aclScalar* ptr_;
 };
 
 } // namespace asnumpy

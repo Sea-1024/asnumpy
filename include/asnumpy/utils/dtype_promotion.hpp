@@ -42,8 +42,9 @@ aclDataType PromoteUnaryFloating(aclDataType in);
 aclDataType PromoteBinaryFloating(aclDataType a, aclDataType b);
 
 /**
- * NumPy reduction accumulate dtype for sum/prod/cumsum/...: bool/int8-int64
- * -> int64, uint8-uint64 -> uint64, floating/complex unchanged.
+ * NumPy reduction accumulate dtype for sum/prod/nansum/nanprod (both the axis-wise
+ * and the global overloads): bool/int8-int64 -> int64, uint8-uint64 -> uint64,
+ * floating/complex unchanged.
  */
 aclDataType PromoteReduction(aclDataType in);
 

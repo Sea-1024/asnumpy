@@ -49,8 +49,8 @@ NPUArray BinaryFloatingOp(const NPUArray& x1, const NPUArray& x2, bool supports_
     NPUArray in1 = EnsureAclDtype(x1, compute);
     NPUArray in2 = EnsureAclDtype(x2, compute);
     py::dtype dtype = NPUArray::GetPyDtype(compute);
-    NPUArray out = EXECUTE_BINARY_OP(in1, in2, dtype, std::forward<GetWs>(get_ws), std::forward<Exec>(exec), op_name,
-                                     api_name);
+    NPUArray out =
+        EXECUTE_BINARY_OP(in1, in2, dtype, std::forward<GetWs>(get_ws), std::forward<Exec>(exec), op_name, api_name);
     if (desired != compute) {
         return CastToDtype(out, desired);
     }

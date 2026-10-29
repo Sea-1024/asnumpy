@@ -14,9 +14,9 @@
  * limitations under the License.
  *****************************************************************************/
 
-#include <asnumpy/utils/dtype_promotion.hpp>
 #include <asnumpy/utils/acl_executor.hpp>
 #include <asnumpy/utils/acl_resource.hpp>
+#include <asnumpy/utils/dtype_promotion.hpp>
 #include <asnumpy/utils/status_handler.hpp>
 
 #include <aclnnop/aclnn_cast.h>

@@ -31,12 +31,8 @@ def test_numpy_major_version_is_two_or_newer():
 def test_numpy_result_type_is_the_dtype_oracle():
     # int32 + float scalar → float64
     if np.result_type(np.array([1], dtype=np.int32), 1.5) != np.dtype("float64"):
-        raise AssertionError(
-            "np.result_type(int32_array, float_scalar) should be float64"
-        )
+        raise AssertionError("np.result_type(int32_array, float_scalar) should be float64")
 
     # float32 + float64 scalar → float64 (NumPy safe-casting rule)
     if np.result_type(np.array([1], dtype=np.float32), np.float64(1)) != np.dtype("float64"):
-        raise AssertionError(
-            "np.result_type(float32_array, float64_scalar) should be float64"
-        )
+        raise AssertionError("np.result_type(float32_array, float64_scalar) should be float64")

@@ -513,17 +513,17 @@ NPUArray Nansum(const NPUArray& a, py::dtype dtype) {
  * @return NPUArray Element-wise result of √(a² + b²)
  */
 NPUArray Hypot(const NPUArray& a, const NPUArray& b) {
-        // check input shapes match
+    // check input shapes match
     if (a.shape != b.shape) {
         throw invalid_argument("Hypot: a and b must have the same shape");
     }
 
-        // initialize output array
+    // initialize output array
     auto shape = a.shape;
     auto dtype = a.dtype;
     NPUArray result(shape, dtype);
 
-        // step 1: compute a squared (a²)
+    // step 1: compute a squared (a²)
     NPUArray a_squared(shape, dtype);
     uint64_t a_sq_workspace_size = 0;
     aclOpExecutor* a_sq_executor = nullptr;
@@ -546,7 +546,7 @@ NPUArray Hypot(const NPUArray& a, const NPUArray& b) {
         throw runtime_error(fmt::format("Hypot: a² computation failed, error={}", error));
     }
 
-        // step 2: compute b squared (b²)
+    // step 2: compute b squared (b²)
     NPUArray b_squared(shape, dtype);
     uint64_t b_sq_workspace_size = 0;
     aclOpExecutor* b_sq_executor = nullptr;
@@ -569,7 +569,7 @@ NPUArray Hypot(const NPUArray& a, const NPUArray& b) {
         throw runtime_error(fmt::format("Hypot: b² computation failed, error={}", error));
     }
 
-        // step 3: compute sum of squares (a² + b²)
+    // step 3: compute sum of squares (a² + b²)
     NPUArray sum_squares(shape, dtype);
     uint64_t add_workspace_size = 0;
     aclOpExecutor* add_executor = nullptr;
@@ -595,7 +595,7 @@ NPUArray Hypot(const NPUArray& a, const NPUArray& b) {
         throw runtime_error(fmt::format("Hypot: sum computation failed, error={}", error));
     }
 
-        // step 4: compute square root (√(a² + b²))
+    // step 4: compute square root (√(a² + b²))
     uint64_t sqrt_workspace_size = 0;
     aclOpExecutor* sqrt_executor = nullptr;
     error = aclnnSqrtGetWorkspaceSize(sum_squares.tensorPtr, result.tensorPtr, &sqrt_workspace_size, &sqrt_executor);
@@ -616,7 +616,7 @@ NPUArray Hypot(const NPUArray& a, const NPUArray& b) {
         throw runtime_error(fmt::format("Hypot: sqrt computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     aclDestroyScalar(alpha_scalar);
     if (a_sq_workspace)
@@ -641,17 +641,17 @@ NPUArray Hypot(const NPUArray& a, const NPUArray& b) {
  * @return NPUArray Result of element-wise arctan2(y, x)
  */
 NPUArray Arctan2(const NPUArray& y, const NPUArray& x) {
-        // check input shapes match
+    // check input shapes match
     if (y.shape != x.shape) {
         throw invalid_argument("Arctan2: y and x must have the same shape");
     }
 
-        // initialize output array
+    // initialize output array
     auto shape = y.shape;
     auto dtype = y.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnAtan2GetWorkspaceSize(y.tensorPtr, x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -659,7 +659,7 @@ NPUArray Arctan2(const NPUArray& y, const NPUArray& x) {
         throw runtime_error(fmt::format("Arctan2: workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -674,7 +674,7 @@ NPUArray Arctan2(const NPUArray& y, const NPUArray& x) {
         throw runtime_error(fmt::format("Arctan2: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace)
         aclrtFree(workspace);
@@ -691,7 +691,7 @@ NPUArray Arctan2(const NPUArray& y, const NPUArray& x) {
  * @return NPUArray Angles converted to radians
  */
 NPUArray Radians(const NPUArray& x) {
-        // initialize output array
+    // initialize output array
     auto shape = x.shape;
     auto dtype = x.dtype;
     auto acl_dtype = x.aclDtype;
@@ -771,12 +771,12 @@ NPUArray Radians(const NPUArray& x) {
  * @return NPUArray Element-wise hyperbolic sine of x
  */
 NPUArray Sinh(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnSinhGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -784,7 +784,7 @@ NPUArray Sinh(const NPUArray& x) {
         throw runtime_error(fmt::format("Sinh: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -793,7 +793,7 @@ NPUArray Sinh(const NPUArray& x) {
         }
     }
 
-        // execute hyperbolic sine computation
+    // execute hyperbolic sine computation
     error = aclnnSinh(workspace, workspace_size, executor,
                       nullptr // no callback needed
     );
@@ -801,7 +801,7 @@ NPUArray Sinh(const NPUArray& x) {
         throw runtime_error(fmt::format("Sinh: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -819,12 +819,12 @@ NPUArray Sinh(const NPUArray& x) {
  * @return NPUArray Element-wise hyperbolic cosine of x
  */
 NPUArray Cosh(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnCoshGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -832,7 +832,7 @@ NPUArray Cosh(const NPUArray& x) {
         throw runtime_error(fmt::format("Cosh: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -841,7 +841,7 @@ NPUArray Cosh(const NPUArray& x) {
         }
     }
 
-        // execute hyperbolic cosine computation
+    // execute hyperbolic cosine computation
     error = aclnnCosh(workspace, workspace_size, executor,
                       nullptr // no callback needed
     );
@@ -849,7 +849,7 @@ NPUArray Cosh(const NPUArray& x) {
         throw runtime_error(fmt::format("Cosh: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -867,12 +867,12 @@ NPUArray Cosh(const NPUArray& x) {
  * @return NPUArray Element-wise hyperbolic tangent of x
  */
 NPUArray Tanh(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnTanhGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -880,7 +880,7 @@ NPUArray Tanh(const NPUArray& x) {
         throw runtime_error(fmt::format("Tanh: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -889,7 +889,7 @@ NPUArray Tanh(const NPUArray& x) {
         }
     }
 
-        // execute hyperbolic tangent computation
+    // execute hyperbolic tangent computation
     error = aclnnTanh(workspace, workspace_size, executor,
                       nullptr // no callback needed
     );
@@ -897,7 +897,7 @@ NPUArray Tanh(const NPUArray& x) {
         throw runtime_error(fmt::format("Tanh: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -915,12 +915,12 @@ NPUArray Tanh(const NPUArray& x) {
  * @return NPUArray Element-wise inverse hyperbolic sine of x
  */
 NPUArray Arcsinh(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnAsinhGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -928,7 +928,7 @@ NPUArray Arcsinh(const NPUArray& x) {
         throw runtime_error(fmt::format("Arcsinh: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -937,7 +937,7 @@ NPUArray Arcsinh(const NPUArray& x) {
         }
     }
 
-        // execute inverse hyperbolic sine computation
+    // execute inverse hyperbolic sine computation
     error = aclnnAsinh(workspace, workspace_size, executor,
                        nullptr // no callback needed
     );
@@ -945,7 +945,7 @@ NPUArray Arcsinh(const NPUArray& x) {
         throw runtime_error(fmt::format("Arcsinh: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -963,12 +963,12 @@ NPUArray Arcsinh(const NPUArray& x) {
  * @return NPUArray Element-wise inverse hyperbolic cosine of x
  */
 NPUArray Arccosh(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnAcoshGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -976,7 +976,7 @@ NPUArray Arccosh(const NPUArray& x) {
         throw runtime_error(fmt::format("Arccosh: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -985,7 +985,7 @@ NPUArray Arccosh(const NPUArray& x) {
         }
     }
 
-        // execute inverse hyperbolic cosine computation
+    // execute inverse hyperbolic cosine computation
     error = aclnnAcosh(workspace, workspace_size, executor,
                        nullptr // no callback needed
     );
@@ -993,7 +993,7 @@ NPUArray Arccosh(const NPUArray& x) {
         throw runtime_error(fmt::format("Arccosh: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -1011,12 +1011,12 @@ NPUArray Arccosh(const NPUArray& x) {
  * @return NPUArray Element-wise inverse hyperbolic tangent of x
  */
 NPUArray Arctanh(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnAtanhGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -1024,7 +1024,7 @@ NPUArray Arctanh(const NPUArray& x) {
         throw runtime_error(fmt::format("Arctanh: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -1033,7 +1033,7 @@ NPUArray Arctanh(const NPUArray& x) {
         }
     }
 
-        // execute inverse hyperbolic tangent computation
+    // execute inverse hyperbolic tangent computation
     error = aclnnAtanh(workspace, workspace_size, executor,
                        nullptr // no callback needed
     );
@@ -1041,7 +1041,7 @@ NPUArray Arctanh(const NPUArray& x) {
         throw runtime_error(fmt::format("Arctanh: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -1059,12 +1059,12 @@ NPUArray Arctanh(const NPUArray& x) {
  * @return NPUArray Element-wise ceiling values of x
  */
 NPUArray Ceil(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnCeilGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -1072,7 +1072,7 @@ NPUArray Ceil(const NPUArray& x) {
         throw runtime_error(fmt::format("Ceil: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -1081,7 +1081,7 @@ NPUArray Ceil(const NPUArray& x) {
         }
     }
 
-        // execute ceiling computation
+    // execute ceiling computation
     error = aclnnCeil(workspace, workspace_size, executor,
                       nullptr // no callback needed
     );
@@ -1089,7 +1089,7 @@ NPUArray Ceil(const NPUArray& x) {
         throw runtime_error(fmt::format("Ceil: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -1107,12 +1107,12 @@ NPUArray Ceil(const NPUArray& x) {
  * @return NPUArray Element-wise truncated values of x
  */
 NPUArray Trunc(const NPUArray& x) {
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x.shape;
     auto dtype = x.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnTruncGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -1120,7 +1120,7 @@ NPUArray Trunc(const NPUArray& x) {
         throw runtime_error(fmt::format("Trunc: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -1129,7 +1129,7 @@ NPUArray Trunc(const NPUArray& x) {
         }
     }
 
-        // execute truncation (keep integer part, discard fractional)
+    // execute truncation (keep integer part, discard fractional)
     error = aclnnTrunc(workspace, workspace_size, executor,
                        nullptr // no callback needed
     );
@@ -1137,7 +1137,7 @@ NPUArray Trunc(const NPUArray& x) {
         throw runtime_error(fmt::format("Trunc: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -1155,11 +1155,11 @@ NPUArray Trunc(const NPUArray& x) {
  * @return NPUArray Boolean array where True indicates negative elements (sign bit set)
  */
 NPUArray Signbit(const NPUArray& x) {
-        // initialize output arraywith same shape as input, bool dtype
+    // initialize output arraywith same shape as input, bool dtype
     auto shape = x.shape;
     NPUArray result(shape, ACL_BOOL); // bool output (True for negative values)
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnSignBitGetWorkspaceSize(x.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -1167,7 +1167,7 @@ NPUArray Signbit(const NPUArray& x) {
         throw runtime_error(fmt::format("Signbit: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -1176,7 +1176,7 @@ NPUArray Signbit(const NPUArray& x) {
         }
     }
 
-        // execute sign bit check (detect negative)
+    // execute sign bit check (detect negative)
     error = aclnnSignBit(workspace, workspace_size, executor,
                          nullptr // no callback needed
     );
@@ -1184,7 +1184,7 @@ NPUArray Signbit(const NPUArray& x) {
         throw runtime_error(fmt::format("Signbit: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -1213,12 +1213,12 @@ NPUArray Signbit(const NPUArray& x) {
  * @return NPUArray Element-wise LCM of x1 and x2
  */
 NPUArray Lcm(const NPUArray& x1, const NPUArray& x2) {
-        // check input shapes match
+    // check input shapes match
     if (x1.shape != x2.shape) {
         throw invalid_argument("Lcm: x1 and x2 must have the same shape");
     }
 
-        // initialize intermediate and final result arrays
+    // initialize intermediate and final result arrays
     auto shape = x1.shape;
     auto dtype = x1.dtype;
     auto acl_dtype = x1.aclDtype;
@@ -1306,7 +1306,7 @@ NPUArray Lcm(const NPUArray& x1, const NPUArray& x2) {
         throw runtime_error(fmt::format("Lcm: division computation failed, error={}", error));
     }
 
-        // synchronize device and release all resources
+    // synchronize device and release all resources
     aclrtSynchronizeDevice();
     aclrtFree(mul_workspace);
     aclrtFree(abs_workspace);
@@ -1325,17 +1325,17 @@ NPUArray Lcm(const NPUArray& x1, const NPUArray& x2) {
  * @return NPUArray Element-wise GCD of x1 and x2
  */
 NPUArray Gcd(const NPUArray& x1, const NPUArray& x2) {
-        // check input shapes match
+    // check input shapes match
     if (x1.shape != x2.shape) {
         throw invalid_argument("Gcd: x1 and x2 must have the same shape");
     }
 
-        // initialize output arraywith same shape and dtype as input
+    // initialize output arraywith same shape and dtype as input
     auto shape = x1.shape;
     auto dtype = x1.dtype;
     NPUArray result(shape, dtype);
 
-        // get workspace size
+    // get workspace size
     uint64_t workspace_size = 0;
     aclOpExecutor* executor = nullptr;
     auto error = aclnnGcdGetWorkspaceSize(x1.tensorPtr, x2.tensorPtr, result.tensorPtr, &workspace_size, &executor);
@@ -1343,7 +1343,7 @@ NPUArray Gcd(const NPUArray& x1, const NPUArray& x2) {
         throw runtime_error(fmt::format("Gcd: get workspace size failed, error={}", error));
     }
 
-        // allocate workspace
+    // allocate workspace
     void* workspace = nullptr;
     if (workspace_size > 0) {
         error = aclrtMalloc(&workspace, workspace_size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -1352,7 +1352,7 @@ NPUArray Gcd(const NPUArray& x1, const NPUArray& x2) {
         }
     }
 
-        // execute GCD computation
+    // execute GCD computation
     error = aclnnGcd(workspace, workspace_size, executor,
                      nullptr // no callback needed
     );
@@ -1360,7 +1360,7 @@ NPUArray Gcd(const NPUArray& x1, const NPUArray& x2) {
         throw runtime_error(fmt::format("Gcd: computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     if (workspace != nullptr) {
         aclrtFree(workspace);
@@ -1380,12 +1380,12 @@ NPUArray Gcd(const NPUArray& x1, const NPUArray& x2) {
  * @return NPUArray Element-wise result of x1^x2
  */
 NPUArray FloatPower(const NPUArray& x1, const NPUArray& x2) {
-        // check input shapes match
+    // check input shapes match
     if (x1.shape != x2.shape) {
         throw invalid_argument("FloatPower: x1 and x2 must have the same shape");
     }
 
-        // initialize intermediate and final result arrays
+    // initialize intermediate and final result arrays
     auto shape = x1.shape;
     auto dtype = x1.dtype;
     NPUArray result(shape, dtype);
@@ -1468,7 +1468,7 @@ NPUArray FloatPower(const NPUArray& x1, const NPUArray& x2) {
         throw runtime_error(fmt::format("FloatPower: exp computation failed, error={}", error));
     }
 
-        // synchronize device and release all resources
+    // synchronize device and release all resources
     aclrtSynchronizeDevice();
     aclrtFree(log_workspace);
     aclrtFree(mul_workspace);
@@ -1489,12 +1489,12 @@ NPUArray FloatPower(const NPUArray& x1, const NPUArray& x2) {
  * @return NPUArray Element-wise remainder of x1 / x2
  */
 NPUArray Fmod(const NPUArray& x1, const NPUArray& x2) {
-        // check input shapes match
+    // check input shapes match
     if (x1.shape != x2.shape) {
         throw invalid_argument("Fmod: x1 and x2 must have the same shape");
     }
 
-        // initialize intermediate and final result arrays
+    // initialize intermediate and final result arrays
     auto shape = x1.shape;
     auto dtype = x1.dtype;
 
@@ -1611,7 +1611,7 @@ NPUArray Fmod(const NPUArray& x1, const NPUArray& x2) {
         throw runtime_error(fmt::format("Fmod: subtraction computation failed, error={}", error));
     }
 
-        // synchronize device and release all resources
+    // synchronize device and release all resources
     aclrtSynchronizeDevice();
     aclrtFree(div_workspace);
     aclrtFree(floor_workspace);
@@ -1633,12 +1633,12 @@ NPUArray Fmod(const NPUArray& x1, const NPUArray& x2) {
  * @return NPUArray Element-wise remainder of x1 / x2
  */
 NPUArray Mod(const NPUArray& x1, const NPUArray& x2) {
-        // check input shapes match
+    // check input shapes match
     if (x1.shape != x2.shape) {
         throw invalid_argument("Mod: x1 and x2 must have the same shape");
     }
 
-        // initialize intermediate and final result arrays
+    // initialize intermediate and final result arrays
     auto shape = x1.shape;
     auto dtype = x1.dtype;
 
@@ -1755,7 +1755,7 @@ NPUArray Mod(const NPUArray& x1, const NPUArray& x2) {
         throw runtime_error(fmt::format("Mod: subtraction computation failed, error={}", error));
     }
 
-        // synchronize device and release all resources
+    // synchronize device and release all resources
     aclrtSynchronizeDevice();
     aclrtFree(div_workspace);
     aclrtFree(trunc_workspace);
@@ -1830,7 +1830,7 @@ std::pair<NPUArray, NPUArray> Modf(const NPUArray& x) {
         throw runtime_error(fmt::format("Modf: subtraction computation failed, error={}", error));
     }
 
-        // synchronize device and release resources
+    // synchronize device and release resources
     aclrtSynchronizeDevice();
     aclrtFree(trunc_workspace);
     aclrtFree(sub_workspace);

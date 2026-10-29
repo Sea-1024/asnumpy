@@ -30,8 +30,8 @@
 #include <aclnnop/aclnn_flip.h>
 #include <aclnnop/aclnn_gelu.h>
 #include <aclnnop/aclnn_heaviside.h>
-#include <aclnnop/aclnn_nan_to_num.h>
 #include <aclnnop/aclnn_mul.h>
+#include <aclnnop/aclnn_nan_to_num.h>
 #include <aclnnop/aclnn_pow.h>
 #include <aclnnop/aclnn_relu.h>
 #include <aclnnop/aclnn_sign.h>

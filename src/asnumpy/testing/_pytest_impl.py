@@ -33,6 +33,7 @@ __all__ = [
 ]
 
 import functools
+import importlib.util
 
 
 def is_available():
@@ -41,12 +42,7 @@ def is_available():
     Returns:
         bool: True if pytest is installed and importable.
     """
-    try:
-        import pytest
-
-        return True
-    except ImportError:
-        return False
+    return importlib.util.find_spec("pytest") is not None
 
 
 class _TestingParameterizeMixin:

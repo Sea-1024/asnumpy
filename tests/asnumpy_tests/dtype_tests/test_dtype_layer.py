@@ -140,7 +140,6 @@ def test_explicit_dtype_argument_still_wins():
     assert ap.add(_arr(np.int32), _arr(np.int32), dtype=np.float32).dtype == np.float32
 
 
-
 def test_ldexp_does_not_promote_against_its_exponent():
     """numpy types ldexp as 'fi->f': the int exponent must not widen the result to float64."""
     x1 = np.array([1.0, 2.0], dtype=np.float32)

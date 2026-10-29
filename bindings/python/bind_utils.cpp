@@ -30,17 +30,16 @@ void bind_utils(pybind11::module_& utils) {
         .def(py::init<const NPUArray&>(), "Copy constructor for NPUArray")
         // Keep _move required and keyword-only: ndarray(other) selects the copy constructor, while
         // ndarray(other, _move=True) selects this consuming constructor.
-        .def(
-            py::init([](NPUArray& other, bool move) {
-                if (!move) {
-                    // The project's exception translator maps std::invalid_argument to
-                    // Python ValueError; py::value_error would be caught as std::runtime_error.
-                    throw std::invalid_argument("_move must be true for the internal consuming constructor");
-                }
-                return NPUArray(std::move(other));
-            }),
-            py::arg("other"), py::kw_only(), py::arg("_move"),
-            "Internal consuming constructor; the source must not be used afterwards")
+        .def(py::init([](NPUArray& other, bool move) {
+                 if (!move) {
+                     // The project's exception translator maps std::invalid_argument to
+                     // Python ValueError; py::value_error would be caught as std::runtime_error.
+                     throw std::invalid_argument("_move must be true for the internal consuming constructor");
+                 }
+                 return NPUArray(std::move(other));
+             }),
+             py::arg("other"), py::kw_only(), py::arg("_move"),
+             "Internal consuming constructor; the source must not be used afterwards")
         .def("to_numpy", &NPUArray::ToNumpy)
         .def_static("from_numpy", &NPUArray::FromNumpy, py::arg("host_data"))
         .def(

@@ -117,6 +117,35 @@ NPUArray ProdWholeTensor(const NPUArray& input) {
     return result;
 }
 
+// All-axes prod with keepdims semantics: (1, ..., 1) result. No multi-axis prod op
+// exists, so reduce one axis at a time; keepdims=true keeps the rank (and later axis
+// indices) valid. 0-d input has no axis to reduce and falls back to aclnnProd.
+NPUArray ProdAllAxes(const NPUArray& input) {
+    if (input.shape.empty()) {
+        return ProdWholeTensor(input);
+    }
+    auto shape = input.shape;
+    std::optional<NPUArray> acc;
+    for (int64_t ax = 0; ax < static_cast<int64_t>(shape.size()); ++ax) {
+        const NPUArray& src = acc.has_value() ? *acc : input;
+        shape[ax] = 1;
+        NPUArray result(shape, input.aclDtype);
+        uint64_t workspaceSize = 0;
+        aclOpExecutor* executor;
+        auto error = aclnnProdDimGetWorkspaceSize(src.tensorPtr, ax, true, result.aclDtype, result.tensorPtr,
+                                                  &workspaceSize, &executor);
+        ACLNN_CHECK(error, "aclnnProdDimGetWorkspaceSize");
+        AclWorkspace workspace(workspaceSize);
+        error = aclnnProdDim(workspace.get(), workspaceSize, executor, nullptr);
+        ACLNN_CHECK(error, "aclnnProdDim");
+        error = aclrtSynchronizeDevice();
+        ACL_RT_CHECK(error, "aclrtSynchronizeDevice");
+        acc = std::move(result);
+    }
+    LOG_INFO("aclnnProdDim all-axes prod completed");
+    return std::move(*acc);
+}
+
 // NaN -> nanValue via aclnnNanToNum; floating inputs only (integers carry no NaN).
 NPUArray ReplaceNan(const NPUArray& a, float nanValue) {
     LOG_DEBUG("aclnnNanToNum start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
@@ -169,6 +198,17 @@ NPUArray Prod(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::
     return EnsureResultDtype(std::move(result), acc);
 }
 
+// axis=None + keepdims: NumPy returns a (1, ..., 1) array instead of a scalar.
+NPUArray Prod(const NPUArray& a, bool /*keepdims*/, std::optional<py::dtype> dtype) {
+    LOG_DEBUG("aclnnProdDim all-axes start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
+              a.tensorSize, AclDtypeName(a.aclDtype));
+    aclDataType acc = ReductionAccDtype(a, dtype);
+    ReductionInput input(a, acc);
+    return EnsureResultDtype(ProdAllAxes(input.get()), acc);
+}
+
+// The scalar overload deliberately keeps aclnnProd: one whole-tensor launch instead of
+// the per-axis loop of ProdAllAxes.
 py::object Prod(const NPUArray& a, std::optional<py::dtype> dtype) {
     LOG_DEBUG("aclnnProd start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape), a.tensorSize,
               AclDtypeName(a.aclDtype));
@@ -210,13 +250,18 @@ NPUArray Sum(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::d
     return EnsureResultDtype(std::move(result), acc);
 }
 
-py::object Sum(const NPUArray& a, std::optional<py::dtype> dtype) {
-    LOG_DEBUG("aclnnReduceSum start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
+// axis=None + keepdims: NumPy returns a (1, ..., 1) array instead of a scalar.
+NPUArray Sum(const NPUArray& a, bool /*keepdims*/, std::optional<py::dtype> dtype) {
+    LOG_DEBUG("aclnnReduceSum all-axes start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
               a.tensorSize, AclDtypeName(a.aclDtype));
     aclDataType acc = ReductionAccDtype(a, dtype);
     ReductionInput input(a, acc);
-    auto result = ReduceSumAllAxes(input.get());
-    return EnsureResultDtype(std::move(result), acc).ToNumpy().attr("reshape")(-1)[py::int_(0)];
+    return EnsureResultDtype(ReduceSumAllAxes(input.get()), acc);
+}
+
+py::object Sum(const NPUArray& a, std::optional<py::dtype> dtype) {
+    // Extract the scalar from the all-axes (1, ..., 1) result; same op sequence.
+    return Sum(a, false, dtype).ToNumpy().attr("reshape")(-1)[py::int_(0)];
 }
 
 NPUArray Nanprod(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype) {
@@ -257,6 +302,25 @@ NPUArray Nanprod(const NPUArray& a, int64_t axis, bool keepdims, std::optional<p
     return EnsureResultDtype(std::move(result), acc);
 }
 
+// axis=None + keepdims: NumPy returns a (1, ..., 1) array instead of a scalar.
+NPUArray Nanprod(const NPUArray& a, bool /*keepdims*/, std::optional<py::dtype> dtype) {
+    LOG_DEBUG("aclnnNanToNum all-axes start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
+              a.tensorSize, AclDtypeName(a.aclDtype));
+    aclDataType acc = ReductionAccDtype(a, dtype);
+    // NaN cleanup runs on the original floating input BEFORE the acc cast: an explicit
+    // integer dtype would otherwise turn NaN into garbage instead of the 1 neutral element.
+    std::optional<NPUArray> cleaned;
+    const NPUArray* base = &a;
+    if (IsFloatingAclDtype(a.aclDtype)) {
+        cleaned = ReplaceNan(a, 1.0F);
+        base = &*cleaned;
+    }
+    ReductionInput input(*base, acc);
+    return EnsureResultDtype(ProdAllAxes(input.get()), acc);
+}
+
+// The scalar overload deliberately keeps aclnnProd: one whole-tensor launch instead of
+// the per-axis loop of ProdAllAxes.
 py::object Nanprod(const NPUArray& a, std::optional<py::dtype> dtype) {
     LOG_DEBUG("aclnnNanToNum start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
               a.tensorSize, AclDtypeName(a.aclDtype));
@@ -314,8 +378,9 @@ NPUArray Nansum(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py
     return EnsureResultDtype(std::move(result), acc);
 }
 
-py::object Nansum(const NPUArray& a, std::optional<py::dtype> dtype) {
-    LOG_DEBUG("aclnnReduceSum start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
+// axis=None + keepdims: NumPy returns a (1, ..., 1) array instead of a scalar.
+NPUArray Nansum(const NPUArray& a, bool /*keepdims*/, std::optional<py::dtype> dtype) {
+    LOG_DEBUG("aclnnReduceSum all-axes start: input_shape={}, tensorSize={}, aclDtype={}", detail::FormatShape(a.shape),
               a.tensorSize, AclDtypeName(a.aclDtype));
     aclDataType acc = ReductionAccDtype(a, dtype);
     // NaN cleanup runs on the original floating input BEFORE the acc cast: an explicit
@@ -328,8 +393,12 @@ py::object Nansum(const NPUArray& a, std::optional<py::dtype> dtype) {
         base = &*cleaned;
     }
     ReductionInput input(*base, acc);
-    auto result = ReduceSumAllAxes(input.get());
-    return EnsureResultDtype(std::move(result), acc).ToNumpy().attr("reshape")(-1)[py::int_(0)];
+    return EnsureResultDtype(ReduceSumAllAxes(input.get()), acc);
+}
+
+py::object Nansum(const NPUArray& a, std::optional<py::dtype> dtype) {
+    // Extract the scalar from the all-axes (1, ..., 1) result; same op sequence.
+    return Nansum(a, false, dtype).ToNumpy().attr("reshape")(-1)[py::int_(0)];
 }
 
 NPUArray Cumprod(const NPUArray& a, int64_t axis, std::optional<py::dtype> dtype) {

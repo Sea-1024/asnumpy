@@ -27,15 +27,19 @@
 namespace asnumpy {
 NPUArray Prod(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 py::object Prod(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
+NPUArray Prod(const NPUArray& a, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Sum(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 py::object Sum(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
+NPUArray Sum(const NPUArray& a, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Nanprod(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 py::object Nanprod(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
+NPUArray Nanprod(const NPUArray& a, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Nansum(const NPUArray& a, int64_t axis, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 py::object Nansum(const NPUArray& a, std::optional<py::dtype> dtype = std::nullopt);
+NPUArray Nansum(const NPUArray& a, bool keepdims, std::optional<py::dtype> dtype = std::nullopt);
 
 NPUArray Cumprod(const NPUArray& a, int64_t axis, std::optional<py::dtype> dtype = std::nullopt);
 

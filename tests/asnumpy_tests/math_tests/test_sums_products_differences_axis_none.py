@@ -186,3 +186,84 @@ def test_nanprod_axis_none_float_contract(xp, dtype):
 def test_nanprod_axis_none_integer_contract(xp, dtype):
     a = _create_array(xp, [[3, 4]], dtype)
     return xp.nanprod(a)
+
+
+# ---------------------------------------------------------------------------
+# axis=None + keepdims=True（返回 (1, ..., 1) 数组而非标量）
+# ---------------------------------------------------------------------------
+
+
+@testing.for_dtypes([numpy.int8, numpy.int64, numpy.float32, numpy.complex64])
+@testing.numpy_asnumpy_allclose(rtol=1e-6, atol=1e-6)
+def test_sum_axis_none_keepdims(xp, dtype):
+    a = _create_array(xp, [[1.5, 2.5], [0.5, 0.5]], dtype)
+    result = xp.sum(a, axis=None, keepdims=True)
+    assert result.shape == (1, 1)
+    return result
+
+
+@testing.for_dtypes([numpy.int8])
+@testing.numpy_asnumpy_allclose()
+def test_sum_axis_none_keepdims_promotes_int8(xp, dtype):
+    """keepdims 不改变提升契约：int8 输入输出仍为 int64"""
+    a = _create_array(xp, [[100, 100], [50, 25]], dtype)
+    result = xp.sum(a, axis=None, keepdims=True)
+    assert result.shape == (1, 1)
+    assert result.dtype == numpy.int64
+    return result
+
+
+@testing.for_dtypes([numpy.int8])
+@testing.numpy_asnumpy_allclose()
+def test_sum_axis_none_keepdims_1d_shape(xp, dtype):
+    a = _create_array(xp, [100, 100], dtype)
+    result = xp.sum(a, axis=None, keepdims=True)
+    assert result.shape == (1,)
+    return result
+
+
+@testing.for_dtypes([numpy.int8])
+@testing.numpy_asnumpy_allclose()
+def test_sum_axis_none_keepdims_empty(xp, dtype):
+    a = _create_array(xp, numpy.zeros((0,), dtype=dtype), dtype)
+    result = xp.sum(a, axis=None, keepdims=True)
+    assert result.shape == (1,)
+    return result
+
+
+@testing.for_dtypes([numpy.bool_, numpy.int8, numpy.uint8, numpy.float32, numpy.complex64])
+@testing.numpy_asnumpy_allclose(rtol=1e-6, atol=1e-6)
+def test_prod_axis_none_keepdims(xp, dtype):
+    # prod=125000：int8/int16 若不提升会回绕，暴露 accumulate dtype 契约
+    a = _create_array(xp, [[100, 100], [50, 25]], dtype)
+    result = xp.prod(a, axis=None, keepdims=True)
+    assert result.shape == (1, 1)
+    return result
+
+
+@testing.for_dtypes([numpy.float32])
+@testing.numpy_asnumpy_allclose()
+def test_prod_axis_none_keepdims_empty(xp, dtype):
+    """空数组全积为 1，keepdims 形状仍为 (1,)"""
+    a = _create_array(xp, numpy.zeros((0,), dtype=dtype), dtype)
+    result = xp.prod(a, axis=None, keepdims=True)
+    assert result.shape == (1,)
+    return result
+
+
+@testing.for_dtypes([numpy.float32, numpy.float16])
+@testing.numpy_asnumpy_allclose(rtol=1e-3, atol=1e-3)
+def test_nansum_axis_none_keepdims(xp, dtype):
+    a = _create_array(xp, [[1.0, numpy.nan], [2.0, 3.0]], dtype)
+    result = xp.nansum(a, axis=None, keepdims=True)
+    assert result.shape == (1, 1)
+    return result
+
+
+@testing.for_dtypes([numpy.float32, numpy.float16])
+@testing.numpy_asnumpy_allclose(rtol=1e-3, atol=1e-3)
+def test_nanprod_axis_none_keepdims(xp, dtype):
+    a = _create_array(xp, [[2.0, numpy.nan], [3.0, 2.0]], dtype)
+    result = xp.nanprod(a, axis=None, keepdims=True)
+    assert result.shape == (1, 1)
+    return result

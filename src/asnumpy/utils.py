@@ -214,6 +214,20 @@ class ndarray(_ndarray):
             return ndarray(self) if copy else self
         return ndarray(super().astype(dtype))
 
+    def reshape(self, new_shape) -> "ndarray":
+        """Return a reshaped array."""
+        if isinstance(new_shape, int):
+            new_shape = (new_shape,)
+        return ndarray(super().reshape(list(new_shape)))
+
+    def flatten(self) -> "ndarray":
+        """Return a flattened 1D array."""
+        return ndarray(super().flatten())
+
+    def ravel(self) -> "ndarray":
+        """Return a flattened array (alias for flatten)."""
+        return ndarray(super().ravel())
+
 
 @logger.catch(reraise=True)
 def broadcast_shape(shape_a: Sequence[int], shape_b: Sequence[int]) -> tuple:

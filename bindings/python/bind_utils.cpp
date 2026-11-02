@@ -75,6 +75,9 @@ void bind_utils(pybind11::module_& utils) {
                 byte_strides[i] = self.strides[i] * itemsize;
             }
             return byte_strides;
-        });
+        })
+        .def("reshape", &NPUArray::Reshape, py::arg("new_shape"), "Reshape the array to a new shape")
+        .def("flatten", &NPUArray::Flatten, "Flatten the array to 1D")
+        .def("ravel", &NPUArray::Ravel, "Ravel the array (alias for flatten)");
     utils.def("broadcast_shape", &GetBroadcastShape, py::arg("a"), py::arg("b"));
 }

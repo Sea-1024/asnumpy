@@ -407,6 +407,76 @@ py::dtype NPUArray::GetPyDtype(aclDataType acl_type) { return asnumpy::dtypes::N
  */
 int64_t NPUArray::GetDataTypeSize(aclDataType dataType) { return asnumpy::dtypes::ItemSize(dataType); }
 
+/**
+ * @brief Reshape array to new shape
+ */
+NPUArray NPUArray::Reshape(const std::vector<int64_t>& new_shape) const {
+    // Calculate total size for validation
+    int64_t new_size = 1;
+    int infer_dim = -1;
+    for (size_t i = 0; i < new_shape.size(); ++i) {
+        if (new_shape[i] == -1) {
+            if (infer_dim != -1) {
+                throw std::invalid_argument("Only one dimension can be -1 in reshape");
+            }
+            infer_dim = static_cast<int>(i);
+        } else if (new_shape[i] < 0) {
+            throw std::invalid_argument("Negative dimensions (other than -1) are not allowed");
+        } else {
+            new_size *= new_shape[i];
+        }
+    }
+
+    // Handle -1 dimension inference
+    std::vector<int64_t> final_shape = new_shape;
+    if (infer_dim != -1) {
+        if (new_size == 0) {
+            throw std::invalid_argument("Cannot infer dimension from shape with zero elements");
+        }
+        if (this->tensorSize % new_size != 0) {
+            throw std::invalid_argument("Cannot reshape array of size " + std::to_string(this->tensorSize) +
+                                        " into shape with inferred dimension");
+        }
+        final_shape[infer_dim] = this->tensorSize / new_size;
+        new_size = this->tensorSize;
+    }
+
+    // Validate total size matches
+    if (new_size != static_cast<int64_t>(this->tensorSize)) {
+        throw std::invalid_argument("Cannot reshape array of size " + std::to_string(this->tensorSize) +
+                                    " into shape with size " + std::to_string(new_size));
+    }
+
+    // Create output array with new shape but same underlying data
+    NPUArray result(final_shape, this->aclDtype);
+
+    // Copy data from current array to reshaped array
+    auto tensorByteSize = CheckedMul(static_cast<int64_t>(this->tensorSize), GetDataTypeSize(this->aclDtype));
+    if (tensorByteSize > 0) {
+        auto error = aclrtMemcpy(result.devicePtr, tensorByteSize, this->devicePtr, tensorByteSize, ACL_MEMCPY_DEVICE_TO_DEVICE);
+        ACL_RT_CHECK(error, "aclrtMemcpy in Reshape");
+        error = aclrtSynchronizeDevice();
+        ACL_RT_CHECK(error, "aclrtSynchronizeDevice in Reshape");
+    }
+
+    return result;
+}
+
+/**
+ * @brief Flatten array to 1D
+ */
+NPUArray NPUArray::Flatten() const {
+    std::vector<int64_t> flat_shape = {static_cast<int64_t>(this->tensorSize)};
+    return this->Reshape(flat_shape);
+}
+
+/**
+ * @brief Ravel array (alias for flatten)
+ */
+NPUArray NPUArray::Ravel() const {
+    return this->Flatten();
+}
+
 std::vector<int64_t> GetBroadcastShape(const NPUArray& a, const NPUArray& b) {
     const std::vector<int64_t>& shapeA = a.shape;
     const std::vector<int64_t>& shapeB = b.shape;

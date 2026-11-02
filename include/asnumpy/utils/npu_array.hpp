@@ -125,6 +125,25 @@ class NPUArray {
      */
     static py::dtype GetPyDtype(aclDataType acl_type);
 
+    /**
+     * @brief Reshape array to new shape
+     * @param new_shape Target shape
+     * @return NPUArray Reshaped array
+     */
+    NPUArray Reshape(const std::vector<int64_t>& new_shape) const;
+
+    /**
+     * @brief Flatten array to 1D
+     * @return NPUArray Flattened array
+     */
+    NPUArray Flatten() const;
+
+    /**
+     * @brief Ravel array (alias for flatten)
+     * @return NPUArray Flattened array
+     */
+    NPUArray Ravel() const;
+
     // -- Not implemented yet --
     /**
      * @brief Update contiguity flags of the NPUArray

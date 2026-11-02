@@ -227,5 +227,3 @@ _version.py
 .cursor/
 .spec-workflow/
 .trellis/
-AGENTS.md
-CLAUDE.md

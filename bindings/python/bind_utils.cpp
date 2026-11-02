@@ -78,6 +78,29 @@ void bind_utils(pybind11::module_& utils) {
         })
         .def("reshape", &NPUArray::Reshape, py::arg("new_shape"), "Reshape the array to a new shape")
         .def("flatten", &NPUArray::Flatten, "Flatten the array to 1D")
-        .def("ravel", &NPUArray::Ravel, "Ravel the array (alias for flatten)");
+        .def("ravel", &NPUArray::Ravel, "Ravel the array (alias for flatten)")
+        .def(
+            "__getitem__",
+            [](const NPUArray& self, const py::object& key) {
+                // a[i] arrives as a bare int; a[i, j] arrives as a tuple. Only
+                // integer indexing is supported here -- slices and index arrays
+                // are rejected rather than silently mis-indexed.
+                std::vector<int64_t> indices;
+                auto push = [&indices](const py::handle& item) {
+                    if (py::isinstance<py::bool_>(item) || !py::isinstance<py::int_>(item)) {
+                        throw py::type_error("only integer indices are supported");
+                    }
+                    indices.push_back(item.cast<int64_t>());
+                };
+                if (py::isinstance<py::tuple>(key)) {
+                    for (const auto& item : key.cast<py::tuple>()) {
+                        push(item);
+                    }
+                } else {
+                    push(key);
+                }
+                return self.GetItem(indices);
+            },
+            py::arg("key"), "Index the array with integer indices over the leading axes");
     utils.def("broadcast_shape", &GetBroadcastShape, py::arg("a"), py::arg("b"));
 }

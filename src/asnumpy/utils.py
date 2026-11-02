@@ -228,6 +228,24 @@ class ndarray(_ndarray):
         """Return a flattened array (alias for flatten)."""
         return ndarray(super().ravel())
 
+    def __getitem__(self, key) -> "ndarray":
+        """Index the array with integer indices over the leading axes.
+
+        Supports ``a[i]`` and ``a[i, j]`` with NumPy's negative-index wrapping.
+        Slices and index arrays are not supported yet and raise TypeError.
+        """
+        # Validate here rather than in C++: the module's exception translator
+        # maps every std::runtime_error (which pybind11's py::type_error derives
+        # from) to RuntimeError, so a TypeError raised in the binding would
+        # reach Python as RuntimeError.
+        items = key if isinstance(key, tuple) else (key,)
+        for item in items:
+            if isinstance(item, bool) or not isinstance(item, (int, np.integer)):
+                raise TypeError(
+                    f"only integer indices are supported, got {type(item).__name__}"
+                )
+        return ndarray(super().__getitem__(key))
+
 
 @logger.catch(reraise=True)
 def broadcast_shape(shape_a: Sequence[int], shape_b: Sequence[int]) -> tuple:

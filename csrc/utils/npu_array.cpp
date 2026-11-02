@@ -477,6 +477,60 @@ NPUArray NPUArray::Ravel() const {
     return this->Flatten();
 }
 
+/**
+ * @brief Basic integer indexing over the leading axes.
+ */
+NPUArray NPUArray::GetItem(const std::vector<int64_t>& indices) const {
+    const size_t ndim = this->shape.size();
+    if (indices.size() > ndim) {
+        // out_of_range, not invalid_argument: the module translator maps it to
+        // Python IndexError, which is what NumPy raises here.
+        throw std::out_of_range(fmt::format("too many indices for array: array is {}-dimensional, but {} were indexed",
+                                            ndim, indices.size()));
+    }
+
+    // Normalize negative indices and bounds-check against the axis they select.
+    // Done before any allocation so a bad index cannot leak device memory.
+    std::vector<int64_t> resolved(indices.size());
+    for (size_t axis = 0; axis < indices.size(); ++axis) {
+        int64_t idx = indices[axis];
+        const int64_t dim = this->shape[axis];
+        if (idx < 0) {
+            idx += dim;
+        }
+        if (idx < 0 || idx >= dim) {
+            throw std::out_of_range(fmt::format("index {} is out of bounds for axis {} with size {}", indices[axis],
+                                                axis, dim));
+        }
+        resolved[axis] = idx;
+    }
+
+    // Trailing axes that were not indexed survive into the result shape.
+    std::vector<int64_t> out_shape(this->shape.begin() + indices.size(), this->shape.end());
+
+    // strides are in elements (byte strides are only synthesized at the Python
+    // boundary), so this offset is an element offset.
+    int64_t element_offset = 0;
+    for (size_t axis = 0; axis < resolved.size(); ++axis) {
+        element_offset += CheckedMul(resolved[axis], this->strides[axis]);
+    }
+
+    NPUArray out(out_shape, this->aclDtype);
+
+    const int64_t itemsize = GetDataTypeSize(this->aclDtype);
+    const int64_t copyByteSize = CheckedMul(static_cast<int64_t>(out.tensorSize), itemsize);
+    if (copyByteSize > 0) {
+        auto* srcPtr = static_cast<char*>(this->devicePtr) + CheckedMul(element_offset, itemsize);
+        auto error =
+            aclrtMemcpy(out.device_address(), copyByteSize, srcPtr, copyByteSize, ACL_MEMCPY_DEVICE_TO_DEVICE);
+        ACL_RT_CHECK(error, "aclrtMemcpy in GetItem");
+        error = aclrtSynchronizeDevice();
+        ACL_RT_CHECK(error, "aclrtSynchronizeDevice in GetItem");
+    }
+
+    return out;
+}
+
 std::vector<int64_t> GetBroadcastShape(const NPUArray& a, const NPUArray& b) {
     const std::vector<int64_t>& shapeA = a.shape;
     const std::vector<int64_t>& shapeB = b.shape;

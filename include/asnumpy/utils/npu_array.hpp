@@ -144,6 +144,23 @@ class NPUArray {
      */
     NPUArray Ravel() const;
 
+    /**
+     * @brief Index the array with a leading run of integer indices.
+     *
+     * Mirrors NumPy basic integer indexing: `indices` must not be longer than
+     * ndim, and each entry selects along the corresponding leading axis.
+     * Negative indices wrap, as in NumPy. The remaining trailing axes are kept,
+     * so a[i] on a (2,3) array returns a (3,) array and a[i, j] returns a 0-d
+     * array. Because asnumpy arrays are dense and C-contiguous, the selection is
+     * one contiguous device block, copied out rather than viewed.
+     *
+     * @param indices Integer index per leading axis.
+     * @return NPUArray Newly allocated array holding the selected sub-block.
+     * @throws std::out_of_range If too many indices are given or an index is out
+     *         of bounds. Surfaces to Python as IndexError.
+     */
+    NPUArray GetItem(const std::vector<int64_t>& indices) const;
+
     // -- Not implemented yet --
     /**
      * @brief Update contiguity flags of the NPUArray

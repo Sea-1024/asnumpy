@@ -101,6 +101,12 @@ void bind_utils(pybind11::module_& utils) {
                 }
                 return self.GetItem(indices);
             },
-            py::arg("key"), "Index the array with integer indices over the leading axes");
+            py::arg("key"), "Index the array with integer indices over the leading axes")
+        .def("transpose", &NPUArray::Transpose, py::arg("axes") = std::vector<int64_t>{},
+             "Permute the array's axes; empty axes reverses them")
+        .def("swapaxes", &NPUArray::SwapAxes, py::arg("axis1"), py::arg("axis2"), "Interchange two axes")
+        .def_property_readonly(
+            "T", [](const NPUArray& self) { return self.Transpose({}); },
+            "The transposed array (all axes reversed)");
     utils.def("broadcast_shape", &GetBroadcastShape, py::arg("a"), py::arg("b"));
 }

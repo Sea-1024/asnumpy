@@ -145,6 +145,30 @@ class NPUArray {
     NPUArray Ravel() const;
 
     /**
+     * @brief Permute the array's axes.
+     *
+     * Mirrors numpy.ndarray.transpose. `axes` must be a permutation of
+     * [0, ndim). When empty, the axes are reversed, which is the NumPy default
+     * and what the `.T` property uses. Negative entries wrap.
+     *
+     * @param axes Target axis order, or empty for a full reversal.
+     * @return NPUArray Newly allocated array with permuted axes.
+     * @throws std::invalid_argument If `axes` is not a permutation of the
+     *         array's axes. Surfaces to Python as ValueError.
+     */
+    NPUArray Transpose(const std::vector<int64_t>& axes) const;
+
+    /**
+     * @brief Interchange two axes.
+     *
+     * @param axis1 First axis; negative values wrap.
+     * @param axis2 Second axis; negative values wrap.
+     * @return NPUArray Newly allocated array with the two axes swapped.
+     * @throws std::invalid_argument If either axis is out of range.
+     */
+    NPUArray SwapAxes(int64_t axis1, int64_t axis2) const;
+
+    /**
      * @brief Index the array with a leading run of integer indices.
      *
      * Mirrors NumPy basic integer indexing: `indices` must not be longer than

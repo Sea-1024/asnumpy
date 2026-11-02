@@ -228,6 +228,32 @@ class ndarray(_ndarray):
         """Return a flattened array (alias for flatten)."""
         return ndarray(super().ravel())
 
+    def transpose(self, *axes) -> "ndarray":
+        """Return a view of the array with axes permuted.
+
+        Accepts NumPy's three spellings: ``a.transpose()`` reverses the axes,
+        ``a.transpose(1, 0)`` takes them varargs-style, and
+        ``a.transpose((1, 0))`` takes a single sequence.
+        """
+        if not axes:
+            order: Sequence[int] = ()
+        elif len(axes) == 1 and axes[0] is None:
+            order = ()
+        elif len(axes) == 1 and isinstance(axes[0], Sequence):
+            order = axes[0]
+        else:
+            order = axes
+        return ndarray(super().transpose([int(a) for a in order]))
+
+    def swapaxes(self, axis1: int, axis2: int) -> "ndarray":
+        """Return a copy of the array with two axes interchanged."""
+        return ndarray(super().swapaxes(axis1, axis2))
+
+    @property
+    def T(self) -> "ndarray":
+        """The array with all axes reversed."""
+        return ndarray(super().T)
+
     def __getitem__(self, key) -> "ndarray":
         """Index the array with integer indices over the leading axes.
 

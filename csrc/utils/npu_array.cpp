@@ -15,8 +15,10 @@
  *****************************************************************************/
 
 #include <asnumpy/dtypes/dtype_table.hpp>
+#include <asnumpy/utils/acl_resource.hpp>
 #include <asnumpy/utils/npu_array.hpp>
 #include <asnumpy/utils/status_handler.hpp>
+#include <aclnnop/aclnn_permute.h>
 #include <cstddef>
 
 namespace {
@@ -529,6 +531,121 @@ NPUArray NPUArray::GetItem(const std::vector<int64_t>& indices) const {
     }
 
     return out;
+}
+
+/**
+ * @brief Permute the array's axes via aclnnPermute.
+ */
+NPUArray NPUArray::Transpose(const std::vector<int64_t>& axes) const {
+    const int64_t ndim = static_cast<int64_t>(this->shape.size());
+
+    // Empty means "reverse all axes" -- NumPy's default and what .T uses.
+    std::vector<int64_t> perm;
+    if (axes.empty()) {
+        perm.resize(ndim);
+        for (int64_t i = 0; i < ndim; ++i) {
+            perm[i] = ndim - 1 - i;
+        }
+    } else {
+        if (static_cast<int64_t>(axes.size()) != ndim) {
+            throw std::invalid_argument(
+                fmt::format("transpose: axes don't match array: got {} axes for {}-dimensional array", axes.size(),
+                            ndim));
+        }
+        perm = axes;
+        std::vector<bool> seen(ndim, false);
+        for (auto& axis : perm) {
+            const int64_t original = axis;
+            if (axis < 0) {
+                axis += ndim;
+            }
+            if (axis < 0 || axis >= ndim) {
+                throw std::invalid_argument(
+                    fmt::format("transpose: axis {} is out of bounds for array of dimension {}", original, ndim));
+            }
+            // A repeated axis would silently drop another one, producing a
+            // result whose shape is right but whose contents are not.
+            if (seen[axis]) {
+                throw std::invalid_argument(fmt::format("transpose: repeated axis {} in axes", axis));
+            }
+            seen[axis] = true;
+        }
+    }
+
+    std::vector<int64_t> out_shape(ndim);
+    for (int64_t i = 0; i < ndim; ++i) {
+        out_shape[i] = this->shape[perm[i]];
+    }
+    NPUArray out(out_shape, this->aclDtype);
+
+    // A 0-d or 1-d array is its own transpose, and aclnnPermute need not be
+    // called for an empty result.
+    if (out.tensorSize == 0 || ndim < 2) {
+        if (out.tensorSize > 0) {
+            const int64_t bytes = CheckedMul(static_cast<int64_t>(out.tensorSize), GetDataTypeSize(this->aclDtype));
+            auto error =
+                aclrtMemcpy(out.device_address(), bytes, this->devicePtr, bytes, ACL_MEMCPY_DEVICE_TO_DEVICE);
+            ACL_RT_CHECK(error, "aclrtMemcpy in Transpose");
+            error = aclrtSynchronizeDevice();
+            ACL_RT_CHECK(error, "aclrtSynchronizeDevice in Transpose");
+        }
+        return out;
+    }
+
+    aclIntArray* dims = aclCreateIntArray(perm.data(), perm.size());
+    if (!dims) {
+        throw std::runtime_error("[npu_array.cpp](Transpose) failed to create aclIntArray");
+    }
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    auto error = aclnnPermuteGetWorkspaceSize(this->tensorPtr, dims, out.tensorPtr, &workspaceSize, &executor);
+    if (error != ACL_SUCCESS) {
+        aclDestroyIntArray(dims);
+        ACLNN_CHECK(error, "aclnnPermuteGetWorkspaceSize");
+    }
+
+    {
+        asnumpy::AclWorkspace workspace(workspaceSize);
+        error = aclnnPermute(workspace.get(), workspaceSize, executor, nullptr);
+        if (error != ACL_SUCCESS) {
+            aclDestroyIntArray(dims);
+            ACLNN_CHECK(error, "aclnnPermute");
+        }
+        error = aclrtSynchronizeDevice();
+        if (error != ACL_SUCCESS) {
+            aclDestroyIntArray(dims);
+            ACL_RT_CHECK(error, "aclrtSynchronizeDevice");
+        }
+    }
+
+    aclDestroyIntArray(dims);
+    return out;
+}
+
+/**
+ * @brief Interchange two axes.
+ */
+NPUArray NPUArray::SwapAxes(int64_t axis1, int64_t axis2) const {
+    const int64_t ndim = static_cast<int64_t>(this->shape.size());
+    auto normalize = [ndim](int64_t axis) {
+        const int64_t original = axis;
+        if (axis < 0) {
+            axis += ndim;
+        }
+        if (axis < 0 || axis >= ndim) {
+            throw std::invalid_argument(
+                fmt::format("swapaxes: axis {} is out of bounds for array of dimension {}", original, ndim));
+        }
+        return axis;
+    };
+
+    std::vector<int64_t> perm(ndim);
+    for (int64_t i = 0; i < ndim; ++i) {
+        perm[i] = i;
+    }
+    std::swap(perm[normalize(axis1)], perm[normalize(axis2)]);
+    return this->Transpose(perm);
 }
 
 std::vector<int64_t> GetBroadcastShape(const NPUArray& a, const NPUArray& b) {

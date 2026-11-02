@@ -42,6 +42,14 @@ class NPUArray {
 
   private:
     void* devicePtr;
+    /**
+     * @brief Byte size of the device allocation behind devicePtr.
+     *
+     * Stored rather than recomputed because the memory pool matches blocks on
+     * exact size; a value derived at free time from a shape that has since
+     * changed would return the block to the wrong free list.
+     */
+    size_t deviceBytes;
 
   public:
     /**
@@ -185,39 +193,10 @@ class NPUArray {
      */
     NPUArray GetItem(const std::vector<int64_t>& indices) const;
 
-    // -- Not implemented yet --
-    /**
-     * @brief Update contiguity flags of the NPUArray
-     */
-    void UpdateContiguity();
-
-    /**
-     * @brief Calculate the size of the tensor
-     */
-    void CalculateSize();
-    /**
-     * @brief Fill with specified value
-     * @param value Value to fill
-     */
-    void Fill(const py::object& value);
-
-    /**
-     * @brief Temporarily retained interface, no effect
-     * @return py::array Returned array
-     */
-    py::array ToArray();
-
-    /**
-     * @brief Return a Python list
-     * @return py::list Returned Python list
-     */
-    py::list ToList() const;
-
-    /**
-     * @brief Create a deep copy
-     * @return std::unique_ptr<NPUArray> Returned deep copy object
-     */
-    std::unique_ptr<NPUArray> Copy() const;
+    // The former declarations View/Copy/Fill/ToList/ToArray/UpdateContiguity/
+    // CalculateSize were removed: none was ever defined or bound, so each was a
+    // link-time trap for anyone who called it. Their intended behavior is now
+    // provided by Reshape (zero-copy), the copy constructor, and ToNumpy.
 };
 
 std::vector<int64_t> GetBroadcastShape(const NPUArray& a, const NPUArray& b);

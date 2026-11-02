@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <fmt/core.h>
 #include <iostream>
+#include <memory>
 #include <pybind11/buffer_info.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -30,6 +31,33 @@
 #include <vector>
 
 namespace py = pybind11;
+
+/**
+ * @brief Refcounted owner of one device allocation.
+ *
+ * Split out of NPUArray so several arrays can share one allocation. A view
+ * holds a shared_ptr to the same DeviceBuffer, so the memory outlives any
+ * individual array that references it -- `a.reshape(...)` stays valid after
+ * `a` is destroyed.
+ *
+ * The allocation is returned to asnumpy::DeviceMemoryPool on destruction, not
+ * to the driver; see device_memory_pool.hpp for why that matters.
+ */
+class DeviceBuffer {
+  public:
+    DeviceBuffer(void* ptr, size_t bytes) : ptr_(ptr), bytes_(bytes) {}
+    ~DeviceBuffer();
+
+    DeviceBuffer(const DeviceBuffer&) = delete;
+    DeviceBuffer& operator=(const DeviceBuffer&) = delete;
+
+    void* data() const noexcept { return ptr_; }
+    size_t bytes() const noexcept { return bytes_; }
+
+  private:
+    void* ptr_;
+    size_t bytes_;
+};
 
 class NPUArray {
   public:
@@ -41,24 +69,47 @@ class NPUArray {
     size_t tensorSize;
 
   private:
-    void* devicePtr;
     /**
-     * @brief Byte size of the device allocation behind devicePtr.
+     * @brief Storage shared with any views of this array.
      *
-     * Stored rather than recomputed because the memory pool matches blocks on
-     * exact size; a value derived at free time from a shape that has since
-     * changed would return the block to the wrong free list.
+     * Null for zero-element arrays, which have no allocation.
      */
-    size_t deviceBytes;
+    std::shared_ptr<DeviceBuffer> buffer;
+
+    /**
+     * @brief Byte offset of this array's first element within `buffer`.
+     *
+     * Nonzero only for views produced by Reshape/Flatten/Ravel/GetItem, all of
+     * which select a C-contiguous region and so keep every downstream
+     * assumption (dense, contiguous) intact.
+     */
+    int64_t byteOffset;
+
+    /**
+     * @brief Build an array that shares `src`'s storage at `offset_bytes`.
+     *
+     * Private because it deliberately skips allocation: the caller must have
+     * verified that the region is contiguous and in bounds.
+     */
+    NPUArray(const NPUArray& src, const std::vector<int64_t>& new_shape, int64_t offset_bytes);
 
   public:
+    /**
+     * @brief The logical start of this array's data on the device.
+     *
+     * This is `buffer + byteOffset`, not the allocation base, so an operator
+     * never needs to know that its input is a view.
+     */
+    void* device_address() const {
+        return buffer ? static_cast<char*>(buffer->data()) + byteOffset : nullptr;
+    }
+
     /**
      * @brief Constructor to create an empty NPUArray from shape and data type
      * @param shape Tensor shape
      * @param dtype Data type
      */
     NPUArray(const std::vector<int64_t>& shape, py::dtype dtype);
-    void* device_address() const { return devicePtr; }
 
     /**
      * @brief Constructor to create an empty NPUArray from shape and ACL data type
@@ -134,21 +185,35 @@ class NPUArray {
     static py::dtype GetPyDtype(aclDataType acl_type);
 
     /**
-     * @brief Reshape array to new shape
-     * @param new_shape Target shape
-     * @return NPUArray Reshaped array
+     * @brief Reshape array to new shape.
+     *
+     * Returns a view: no device memory is allocated and no bytes are copied,
+     * matching NumPy and CuPy. The result shares storage with this array, so a
+     * write through either would be visible through both -- the rule NumPy
+     * documents for views. Nothing in asnumpy can currently write in place, but
+     * the contract is stated here because adding __setitem__ or out= later must
+     * not silently break it.
+     *
+     * @return NPUArray Reshaped view over the same storage.
+     * @throws std::invalid_argument If the shapes hold different element counts,
+     *         or more than one dimension is -1. Surfaces to Python as ValueError.
      */
     NPUArray Reshape(const std::vector<int64_t>& new_shape) const;
 
     /**
-     * @brief Flatten array to 1D
-     * @return NPUArray Flattened array
+     * @brief Flatten array to 1D.
+     *
+     * A view, not a copy -- NumPy's flatten() copies but its ravel() does not;
+     * asnumpy has no F-order arrays, so both are the same zero-copy operation
+     * here. See Reshape.
+     *
+     * @return NPUArray 1-D view over the same storage.
      */
     NPUArray Flatten() const;
 
     /**
-     * @brief Ravel array (alias for flatten)
-     * @return NPUArray Flattened array
+     * @brief Ravel array (alias for flatten).
+     * @return NPUArray 1-D view over the same storage.
      */
     NPUArray Ravel() const;
 
@@ -160,7 +225,9 @@ class NPUArray {
      * and what the `.T` property uses. Negative entries wrap.
      *
      * @param axes Target axis order, or empty for a full reversal.
-     * @return NPUArray Newly allocated array with permuted axes.
+     * @return NPUArray Newly allocated array with permuted axes. Transpose
+     *         materializes the permutation rather than returning a strided
+     *         view, because downstream operators assume C-contiguous input.
      * @throws std::invalid_argument If `axes` is not a permutation of the
      *         array's axes. Surfaces to Python as ValueError.
      */

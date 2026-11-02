@@ -16,6 +16,7 @@
 
 import numpy
 import pytest
+
 from asnumpy import testing
 
 

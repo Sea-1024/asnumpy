@@ -23,10 +23,10 @@ from ._core.array import (
     empty as _empty,
 )
 from ._core.array import (
-    expand_dims as _expand_dims,
+    empty_like as _empty_like,
 )
 from ._core.array import (
-    empty_like as _empty_like,
+    expand_dims as _expand_dims,
 )
 from ._core.array import (
     eye as _eye,

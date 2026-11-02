@@ -149,11 +149,30 @@ Pre-commit hooks run automatically on `git commit` if installed via `pre-commit 
 `NPUArray` is the core data structure with:
 - **dtype** (py::dtype) - Element type
 - **shape** (std::vector<int64_t>) - Dimensions
-- **strides** (std::vector<int64_t>) - Memory layout
-- **tensorPtr** (aclTensor*) - CANN tensor handle
-- **devicePtr** (void*, private) - Raw device memory
+- **strides** (std::vector<int64_t>) - Memory layout, **in elements, not bytes**. Byte strides exist only at the Python boundary.
+- **tensorPtr** (aclTensor*) - CANN tensor handle, pointing at `buffer + byteOffset`
+- **buffer** (std::shared_ptr\<DeviceBuffer\>, private) - Refcounted device allocation
+- **byteOffset** (int64_t, private) - Start of this array's data within `buffer`
 
-**RAII resource management**: Destructor automatically calls `aclDestroyTensor` and `aclrtFree`. No manual cleanup needed.
+**Shared storage, zero-copy views.** `Reshape`, `Flatten`, `Ravel` and `GetItem` return
+views: they share `buffer` with their source and allocate nothing. Semantics match NumPy,
+so a view and its source alias the same memory. Nothing can currently write in place (there
+is no `__setitem__` and `multiply()` rejects `out=`), but any future in-place API must
+honor that rule. `Transpose` is the deliberate exception — it materializes, because a
+permuted array is not C-contiguous and downstream operators assume they are.
+
+**Memory pooling.** Allocations go through `asnumpy::DeviceMemoryPool`
+(`include/asnumpy/utils/device_memory_pool.hpp`), never `aclrtMalloc` directly. The pool
+caches freed blocks by exact byte size (capped at 256 MB, evicting largest-first), because
+the driver's allocation cost is not proportional to the request — 64 MB measured 399 µs
+against 15 µs for 4 MB, and every operator allocates at least one output. If you add a
+place that needs device memory, go through the pool and call `Clear()` before any device
+reset. Workspace allocations inside individual operator bodies still use their own
+`aclrtMalloc`/`aclrtFree` pairs and are not pooled.
+
+**RAII resource management**: the destructor calls `aclDestroyTensor`; `DeviceBuffer`'s
+destructor returns the allocation to the pool when the last referencing array dies. No
+manual cleanup needed, and a view stays valid after the array it was made from is gone.
 
 **Data transfer**:
 - `FromNumpy(np.ndarray)` → NPU (ACL_MEMCPY_HOST_TO_DEVICE)

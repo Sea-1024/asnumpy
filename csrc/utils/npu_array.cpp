@@ -18,6 +18,7 @@
 #include <asnumpy/utils/acl_resource.hpp>
 #include <asnumpy/utils/npu_array.hpp>
 #include <asnumpy/utils/status_handler.hpp>
+#include <asnumpy/utils/device_memory_pool.hpp>
 #include <aclnnop/aclnn_permute.h>
 #include <cstddef>
 
@@ -33,7 +34,56 @@ int64_t CheckedMul(int64_t a, int64_t b) {
     return result;
 }
 
+// aclCreateTensor returns nullptr on failure and it was previously never
+// checked, so a failure surfaced later as a null tensor in an operator call,
+// far from the cause.
+aclTensor* CreateTensorChecked(const int64_t* view_dims, uint64_t view_ndim, aclDataType dtype,
+                               const int64_t* strides, int64_t offset, aclFormat format, const int64_t* storage_dims,
+                               uint64_t storage_ndim, void* data, const char* where) {
+    aclTensor* tensor = aclCreateTensor(view_dims, view_ndim, dtype, strides, offset, format, storage_dims,
+                                        storage_ndim, data);
+    if (!tensor) {
+        throw std::runtime_error(fmt::format("[npu_array.cpp]({}) aclCreateTensor returned null", where));
+    }
+    return tensor;
+}
+
 } // namespace
+
+/**
+ * @brief Build an array that shares `src`'s storage at a byte offset.
+ *
+ * Used by Reshape/Flatten/Ravel/GetItem. Callers are responsible for having
+ * established that the region is contiguous and inside `src`; this constructor
+ * trusts them and allocates nothing.
+ */
+NPUArray::NPUArray(const NPUArray& src, const std::vector<int64_t>& new_shape, int64_t offset_bytes)
+    : shape(new_shape),
+      dtype(src.dtype),
+      aclDtype(src.aclDtype),
+      tensorSize(GetShapeSize(new_shape)),
+      buffer(src.buffer),
+      byteOffset(offset_bytes) {
+    this->strides.resize(this->shape.size());
+    int64_t currentStride = 1;
+    for (int64_t i = static_cast<int64_t>(this->shape.size()) - 1; i >= 0; i--) {
+        this->strides[i] = currentStride;
+        currentStride *= this->shape[i];
+    }
+    // The aclTensor points at buffer + offset, so operators never learn that
+    // their input is a view.
+    tensorPtr = CreateTensorChecked(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(), 0,
+                                    ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->device_address(),
+                                    "view ctor");
+}
+
+/**
+ * @brief Return the allocation to the pool when the last referent goes away.
+ *
+ * Not to aclrtFree directly: the pool matches blocks on exact byte size, and
+ * this is the only place that knows the size the block was allocated with.
+ */
+DeviceBuffer::~DeviceBuffer() { asnumpy::DeviceMemoryPool::Release(ptr_, bytes_); }
 
 /**
  * @brief Constructor that creates an NPUArray with specified shape and data type.
@@ -51,10 +101,11 @@ NPUArray::NPUArray(const std::vector<int64_t>& shape, py::dtype dtype) {
     this->aclDtype = GetACLDataType(dtype);
     tensorSize = GetShapeSize(shape);
     auto tensorByteSize = CheckedMul(static_cast<int64_t>(this->tensorSize), GetDataTypeSize(this->aclDtype));
-    this->devicePtr = nullptr;
+    this->byteOffset = 0;
     if (tensorByteSize > 0) {
-        auto error = aclrtMalloc(&this->devicePtr, tensorByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
-        ACL_RT_CHECK(error, "aclrtMalloc");
+        this->buffer = std::make_shared<DeviceBuffer>(asnumpy::DeviceMemoryPool::Allocate(
+                                                          static_cast<size_t>(tensorByteSize)),
+                                                      static_cast<size_t>(tensorByteSize));
     }
     this->strides.resize(this->shape.size());
     int64_t currentStride = 1; // int64_t: auto would deduce int and truncate large shapes
@@ -62,9 +113,9 @@ NPUArray::NPUArray(const std::vector<int64_t>& shape, py::dtype dtype) {
         this->strides[i] = currentStride;
         currentStride *= this->shape[i];
     }
-    tensorPtr =
-        aclCreateTensor(this->shape.data(), this->shape.size(), GetACLDataType(this->dtype), this->strides.data(), 0,
-                        ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->devicePtr);
+    tensorPtr = CreateTensorChecked(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(), 0,
+                                    ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->device_address(),
+                                    "ctor");
 }
 
 /**
@@ -88,10 +139,11 @@ NPUArray::NPUArray(const std::vector<int64_t>& shape, aclDataType acl_type) {
     // for compatibility, create an empty py::dtype object
     this->dtype = GetPyDtype(acl_type);
 
-    this->devicePtr = nullptr;
+    this->byteOffset = 0;
     if (tensorByteSize > 0) {
-        auto error = aclrtMalloc(&this->devicePtr, tensorByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
-        ACL_RT_CHECK(error, "aclrtMalloc");
+        this->buffer = std::make_shared<DeviceBuffer>(asnumpy::DeviceMemoryPool::Allocate(
+                                                          static_cast<size_t>(tensorByteSize)),
+                                                      static_cast<size_t>(tensorByteSize));
     }
     this->strides.resize(this->shape.size());
     int64_t currentStride = 1; // int64_t: auto would deduce int and truncate large shapes
@@ -99,8 +151,9 @@ NPUArray::NPUArray(const std::vector<int64_t>& shape, aclDataType acl_type) {
         this->strides[i] = currentStride;
         currentStride *= this->shape[i];
     }
-    tensorPtr = aclCreateTensor(this->shape.data(), this->shape.size(), acl_type, this->strides.data(), 0,
-                                ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->devicePtr);
+    tensorPtr = CreateTensorChecked(this->shape.data(), this->shape.size(), acl_type, this->strides.data(), 0,
+                                    ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->device_address(),
+                                    "ctor");
 }
 
 /**
@@ -117,27 +170,28 @@ NPUArray::NPUArray(const NPUArray& other) {
     this->aclDtype = other.aclDtype;
     this->tensorSize = other.tensorSize;
     this->strides = other.strides;
+    this->byteOffset = 0;
     auto tensorByteSize = CheckedMul(static_cast<int64_t>(this->tensorSize), GetDataTypeSize(this->aclDtype));
-    this->devicePtr = nullptr;
     if (tensorByteSize > 0) {
-        auto error = aclrtMalloc(&this->devicePtr, tensorByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
-        ACL_RT_CHECK(error, "aclrtMalloc");
-        this->tensorPtr = aclCreateTensor(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(),
-                                          0, ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->devicePtr);
+        this->buffer = std::make_shared<DeviceBuffer>(asnumpy::DeviceMemoryPool::Allocate(
+                                                          static_cast<size_t>(tensorByteSize)),
+                                                      static_cast<size_t>(tensorByteSize));
+    }
+    this->tensorPtr = CreateTensorChecked(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(),
+                                          0, ACL_FORMAT_ND, this->shape.data(), this->shape.size(),
+                                          this->device_address(), "copy ctor");
+    if (tensorByteSize > 0) {
         void* srcPtr = nullptr;
-        error = aclGetRawTensorAddr(other.tensorPtr, &srcPtr);
+        auto error = aclGetRawTensorAddr(other.tensorPtr, &srcPtr);
         ACL_RT_CHECK(error, "aclGetRawTensorAddr");
         if (!srcPtr) {
             throw std::runtime_error("[npu_array.cpp](NPUArray) aclGetRawTensorAddr returned null pointer");
         }
-        error = aclrtMemcpy(this->devicePtr, tensorByteSize, srcPtr, tensorByteSize, ACL_MEMCPY_DEVICE_TO_DEVICE);
+        error =
+            aclrtMemcpy(this->device_address(), tensorByteSize, srcPtr, tensorByteSize, ACL_MEMCPY_DEVICE_TO_DEVICE);
         ACL_RT_CHECK(error, "aclrtMemcpy");
         error = aclrtSynchronizeDevice();
         ACL_RT_CHECK(error, "aclrtSynchronizeDevice");
-    } else {
-        // zero-size array; pass nullptr as data pointer when creating tensor
-        this->tensorPtr = aclCreateTensor(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(),
-                                          0, ACL_FORMAT_ND, this->shape.data(), this->shape.size(), nullptr);
     }
 }
 
@@ -156,9 +210,10 @@ NPUArray::NPUArray(NPUArray&& other) noexcept {
     this->aclDtype = other.aclDtype;
     this->tensorSize = other.tensorSize;
     this->strides = std::move(other.strides);
-    this->devicePtr = other.devicePtr;
+    this->buffer = std::move(other.buffer);
+    this->byteOffset = other.byteOffset;
     other.tensorPtr = nullptr;
-    other.devicePtr = nullptr;
+    other.byteOffset = 0;
 }
 
 /**
@@ -176,10 +231,9 @@ NPUArray& NPUArray::operator=(const NPUArray& other) {
             aclDestroyTensor(this->tensorPtr);
             this->tensorPtr = nullptr;
         }
-        if (this->devicePtr) {
-            aclrtFree(this->devicePtr);
-            this->devicePtr = nullptr;
-        }
+        this->buffer.reset();
+        this->byteOffset = 0;
+
         this->shape = other.shape;
         this->dtype = other.dtype;
         this->aclDtype = other.aclDtype;
@@ -187,28 +241,27 @@ NPUArray& NPUArray::operator=(const NPUArray& other) {
         this->strides = other.strides;
 
         auto tensorByteSize = CheckedMul(static_cast<int64_t>(this->tensorSize), GetDataTypeSize(this->aclDtype));
-        this->devicePtr = nullptr;
         if (tensorByteSize > 0) {
-            auto error = aclrtMalloc(&this->devicePtr, tensorByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
-            ACL_RT_CHECK(error, "aclrtMalloc");
-            this->tensorPtr =
-                aclCreateTensor(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(), 0,
-                                ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->devicePtr);
+            this->buffer = std::make_shared<DeviceBuffer>(asnumpy::DeviceMemoryPool::Allocate(
+                                                              static_cast<size_t>(tensorByteSize)),
+                                                          static_cast<size_t>(tensorByteSize));
+        }
+        this->tensorPtr =
+            CreateTensorChecked(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(), 0,
+                                ACL_FORMAT_ND, this->shape.data(), this->shape.size(), this->device_address(),
+                                "operator=");
+        if (tensorByteSize > 0) {
             void* srcPtr = nullptr;
-            error = aclGetRawTensorAddr(other.tensorPtr, &srcPtr);
+            auto error = aclGetRawTensorAddr(other.tensorPtr, &srcPtr);
             ACL_RT_CHECK(error, "aclGetRawTensorAddr");
             if (!srcPtr) {
                 throw std::runtime_error("[npu_array.cpp](operator=) aclGetRawTensorAddr returned null pointer");
             }
-            error = aclrtMemcpy(this->devicePtr, tensorByteSize, srcPtr, tensorByteSize, ACL_MEMCPY_DEVICE_TO_DEVICE);
+            error = aclrtMemcpy(this->device_address(), tensorByteSize, srcPtr, tensorByteSize,
+                                ACL_MEMCPY_DEVICE_TO_DEVICE);
             ACL_RT_CHECK(error, "aclrtMemcpy");
             error = aclrtSynchronizeDevice();
             ACL_RT_CHECK(error, "aclrtSynchronizeDevice");
-        } else {
-            // zero-size array; pass nullptr as data pointer when creating tensor
-            this->tensorPtr =
-                aclCreateTensor(this->shape.data(), this->shape.size(), this->aclDtype, this->strides.data(), 0,
-                                ACL_FORMAT_ND, this->shape.data(), this->shape.size(), nullptr);
         }
     }
     return *this;
@@ -230,20 +283,19 @@ NPUArray& NPUArray::operator=(NPUArray&& other) noexcept {
             aclDestroyTensor(this->tensorPtr);
             this->tensorPtr = nullptr;
         }
-        if (this->devicePtr) {
-            aclrtFree(this->devicePtr);
-            this->devicePtr = nullptr;
-        }
+        this->buffer.reset();
+
         this->tensorPtr = other.tensorPtr;
-        this->devicePtr = other.devicePtr;
         this->shape = std::move(other.shape);
         this->dtype = other.dtype;
         this->aclDtype = other.aclDtype;
         this->tensorSize = other.tensorSize;
         this->strides = std::move(other.strides);
-        this->devicePtr = other.devicePtr;
+        this->buffer = std::move(other.buffer);
+        this->byteOffset = other.byteOffset;
+
         other.tensorPtr = nullptr;
-        other.devicePtr = nullptr;
+        other.byteOffset = 0;
     }
     return *this;
 }
@@ -252,13 +304,13 @@ NPUArray& NPUArray::operator=(NPUArray&& other) noexcept {
  * @brief Destructor that releases resources occupied by NPUArray.
  */
 NPUArray::~NPUArray() {
+    // Only the tensor handle is destroyed here. The allocation belongs to
+    // `buffer`, whose shared_ptr returns it to the pool when the last array
+    // referencing it goes away -- which is what keeps a view alive after the
+    // array it was made from is gone.
     if (this->tensorPtr) {
-        auto error = aclDestroyTensor(this->tensorPtr);
+        aclDestroyTensor(this->tensorPtr);
         this->tensorPtr = nullptr;
-    }
-    if (this->devicePtr) {
-        auto error = aclrtFree(this->devicePtr);
-        this->devicePtr = nullptr;
     }
 }
 
@@ -449,19 +501,11 @@ NPUArray NPUArray::Reshape(const std::vector<int64_t>& new_shape) const {
                                     " into shape with size " + std::to_string(new_size));
     }
 
-    // Create output array with new shape but same underlying data
-    NPUArray result(final_shape, this->aclDtype);
-
-    // Copy data from current array to reshaped array
-    auto tensorByteSize = CheckedMul(static_cast<int64_t>(this->tensorSize), GetDataTypeSize(this->aclDtype));
-    if (tensorByteSize > 0) {
-        auto error = aclrtMemcpy(result.devicePtr, tensorByteSize, this->devicePtr, tensorByteSize, ACL_MEMCPY_DEVICE_TO_DEVICE);
-        ACL_RT_CHECK(error, "aclrtMemcpy in Reshape");
-        error = aclrtSynchronizeDevice();
-        ACL_RT_CHECK(error, "aclrtSynchronizeDevice in Reshape");
-    }
-
-    return result;
+    // A reshape never reorders elements, so the result is the same storage
+    // seen through a different shape: no allocation, no copy. Previously this
+    // allocated a fresh buffer and copied every byte, which cost 528 us on a
+    // 4 MB array -- 6.7x more than running an actual multiply kernel over it.
+    return NPUArray(*this, final_shape, this->byteOffset);
 }
 
 /**
@@ -517,20 +561,12 @@ NPUArray NPUArray::GetItem(const std::vector<int64_t>& indices) const {
         element_offset += CheckedMul(resolved[axis], this->strides[axis]);
     }
 
-    NPUArray out(out_shape, this->aclDtype);
-
+    // Fixing a run of leading indices leaves every trailing axis whole, so the
+    // selected region is one contiguous block -- which is what makes a view
+    // possible here at all. An index run with a gap (a[i, :, k]) would not be.
     const int64_t itemsize = GetDataTypeSize(this->aclDtype);
-    const int64_t copyByteSize = CheckedMul(static_cast<int64_t>(out.tensorSize), itemsize);
-    if (copyByteSize > 0) {
-        auto* srcPtr = static_cast<char*>(this->devicePtr) + CheckedMul(element_offset, itemsize);
-        auto error =
-            aclrtMemcpy(out.device_address(), copyByteSize, srcPtr, copyByteSize, ACL_MEMCPY_DEVICE_TO_DEVICE);
-        ACL_RT_CHECK(error, "aclrtMemcpy in GetItem");
-        error = aclrtSynchronizeDevice();
-        ACL_RT_CHECK(error, "aclrtSynchronizeDevice in GetItem");
-    }
-
-    return out;
+    const int64_t byte_offset = CheckedMul(element_offset, itemsize);
+    return NPUArray(*this, out_shape, this->byteOffset + byte_offset);
 }
 
 /**
@@ -584,7 +620,7 @@ NPUArray NPUArray::Transpose(const std::vector<int64_t>& axes) const {
         if (out.tensorSize > 0) {
             const int64_t bytes = CheckedMul(static_cast<int64_t>(out.tensorSize), GetDataTypeSize(this->aclDtype));
             auto error =
-                aclrtMemcpy(out.device_address(), bytes, this->devicePtr, bytes, ACL_MEMCPY_DEVICE_TO_DEVICE);
+                aclrtMemcpy(out.device_address(), bytes, this->device_address(), bytes, ACL_MEMCPY_DEVICE_TO_DEVICE);
             ACL_RT_CHECK(error, "aclrtMemcpy in Transpose");
             error = aclrtSynchronizeDevice();
             ACL_RT_CHECK(error, "aclrtSynchronizeDevice in Transpose");

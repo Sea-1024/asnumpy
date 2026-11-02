@@ -14,7 +14,7 @@
 # limitations under the License.
 # *****************************************************************************
 
-add_library(utils OBJECT npu_array.cpp npu_scalar.cpp status_handler.cpp acl_resource.cpp cast.cpp dtype_promotion.cpp)
+add_library(utils OBJECT npu_array.cpp npu_scalar.cpp status_handler.cpp acl_resource.cpp cast.cpp dtype_promotion.cpp device_memory_pool.cpp)
 
 target_include_directories(utils PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_compile_definitions(utils PUBLIC SPDLOG_FMT_EXTERNAL)

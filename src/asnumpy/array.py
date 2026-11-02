@@ -17,6 +17,9 @@
 from loguru import logger
 
 from ._core.array import (
+    concatenate as _concatenate,
+)
+from ._core.array import (
     empty as _empty,
 )
 from ._core.array import (
@@ -42,6 +45,9 @@ from ._core.array import (
 )
 from ._core.array import (
     ones_like as _ones_like,
+)
+from ._core.array import (
+    stack as _stack,
 )
 from ._core.array import (
     zeros as _zeros,
@@ -122,3 +128,61 @@ def linspace(
 ) -> ndarray:
     logger.debug(f"Creating linspace array start={start}, end={end}, steps={steps}, dtype={dtype}")
     return ndarray(_linspace(start, end, steps, _convert_dtype(dtype)))
+
+
+def _as_array_sequence(arrays, func_name: str) -> list:
+    """Normalize the array sequence accepted by concatenate/stack.
+
+    NumPy accepts any sequence here, and callers commonly pass a tuple. The
+    binding takes a std::vector<NPUArray>, so the elements must already be
+    device arrays -- host data is rejected rather than implicitly transferred.
+    """
+    if isinstance(arrays, ndarray):
+        raise TypeError(f"{func_name}: expected a sequence of arrays, got a single ndarray")
+    seq = list(arrays)
+    if not seq:
+        raise ValueError(f"{func_name}: need at least one array")
+    for item in seq:
+        if not isinstance(item, ndarray):
+            raise TypeError(
+                f"{func_name}: expected asnumpy ndarray elements, got {type(item).__name__}; "
+                "transfer host data with ndarray.from_numpy() first"
+            )
+    return seq
+
+
+@logger.catch(reraise=True)
+def concatenate(arrays, axis: int = 0) -> ndarray:
+    """Join a sequence of arrays along an existing axis."""
+    logger.debug(f"Concatenating arrays axis={axis}")
+    return ndarray(_concatenate(_as_array_sequence(arrays, "concatenate"), axis))
+
+
+@logger.catch(reraise=True)
+def stack(arrays, axis: int = 0) -> ndarray:
+    """Join a sequence of arrays along a new axis."""
+    logger.debug(f"Stacking arrays axis={axis}")
+    return ndarray(_stack(_as_array_sequence(arrays, "stack"), axis))
+
+
+@logger.catch(reraise=True)
+def vstack(arrays) -> ndarray:
+    """Stack arrays in sequence vertically (row wise).
+
+    1-D inputs are promoted to 2-D rows first, matching numpy.vstack, so
+    vstack of two (3,) arrays gives (2, 3) rather than (6,).
+    """
+    seq = _as_array_sequence(arrays, "vstack")
+    promoted = [a.reshape((1, a.shape[0])) if a.ndim == 1 else a for a in seq]
+    return ndarray(_concatenate(promoted, 0))
+
+
+@logger.catch(reraise=True)
+def hstack(arrays) -> ndarray:
+    """Stack arrays in sequence horizontally (column wise).
+
+    1-D inputs concatenate along axis 0, matching numpy.hstack.
+    """
+    seq = _as_array_sequence(arrays, "hstack")
+    axis = 0 if seq[0].ndim == 1 else 1
+    return ndarray(_concatenate(seq, axis))

@@ -47,15 +47,19 @@ if TYPE_CHECKING:
         ShapeLike,
     )
     from .array import (
+        concatenate,
         empty,
         empty_like,
         eye,
         full,
         full_like,
+        hstack,
         identity,
         linspace,
         ones,
         ones_like,
+        stack,
+        vstack,
         zeros,
         zeros_like,
     )
@@ -217,15 +221,19 @@ _NUMPY_DTYPE_NAMES = {
 
 _LAZY_MAPPING = {
     # .array
+    "concatenate": ".array",
     "empty": ".array",
     "empty_like": ".array",
     "eye": ".array",
     "full": ".array",
     "full_like": ".array",
+    "hstack": ".array",
     "identity": ".array",
     "linspace": ".array",
     "ones": ".array",
     "ones_like": ".array",
+    "stack": ".array",
+    "vstack": ".array",
     "zeros": ".array",
     "zeros_like": ".array",
     # .linalg

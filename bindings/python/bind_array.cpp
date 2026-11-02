@@ -15,6 +15,7 @@
  ******************************************************************************/
 
 #include <asnumpy/array/basic.hpp>
+#include <asnumpy/array/manipulation.hpp>
 #include <algorithm>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -36,4 +37,6 @@ void bind_array(pybind11::module_& array) {
     array.def("identity", &Identity, py::arg("n"), py::arg("dtype"));
     array.def("linspace", &Linspace, py::arg("start"), py::arg("end"), py::arg("steps") = 50,
               py::arg("dtype") = py::none());
+    array.def("concatenate", &Concatenate, py::arg("arrays"), py::arg("axis") = 0);
+    array.def("stack", &Stack, py::arg("arrays"), py::arg("axis") = 0);
 }

@@ -254,6 +254,16 @@ class ndarray(_ndarray):
         """The array with all axes reversed."""
         return ndarray(super().T)
 
+    def squeeze(self, axis=None) -> "ndarray":
+        """Remove axes of length one.
+
+        Imported lazily to avoid a circular import: asnumpy.array imports
+        ndarray from this module.
+        """
+        from .array import squeeze as _squeeze_fn
+
+        return _squeeze_fn(self, axis)
+
     def __getitem__(self, key) -> "ndarray":
         """Index the array with integer indices over the leading axes.
 

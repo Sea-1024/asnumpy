@@ -39,4 +39,6 @@ void bind_array(pybind11::module_& array) {
               py::arg("dtype") = py::none());
     array.def("concatenate", &Concatenate, py::arg("arrays"), py::arg("axis") = 0);
     array.def("stack", &Stack, py::arg("arrays"), py::arg("axis") = 0);
+    array.def("squeeze", &Squeeze, py::arg("array"), py::arg("axes") = std::vector<int64_t>{});
+    array.def("expand_dims", &ExpandDims, py::arg("array"), py::arg("axis"));
 }

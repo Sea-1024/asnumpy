@@ -23,6 +23,9 @@ from ._core.array import (
     empty as _empty,
 )
 from ._core.array import (
+    expand_dims as _expand_dims,
+)
+from ._core.array import (
     empty_like as _empty_like,
 )
 from ._core.array import (
@@ -45,6 +48,9 @@ from ._core.array import (
 )
 from ._core.array import (
     ones_like as _ones_like,
+)
+from ._core.array import (
+    squeeze as _squeeze,
 )
 from ._core.array import (
     stack as _stack,
@@ -186,3 +192,23 @@ def hstack(arrays) -> ndarray:
     seq = _as_array_sequence(arrays, "hstack")
     axis = 0 if seq[0].ndim == 1 else 1
     return ndarray(_concatenate(seq, axis))
+
+
+@logger.catch(reraise=True)
+def squeeze(a: ndarray, axis=None) -> ndarray:
+    """Remove axes of length one from `a`."""
+    logger.debug(f"Squeezing array axis={axis}")
+    if axis is None:
+        axes: list[int] = []
+    elif isinstance(axis, int):
+        axes = [axis]
+    else:
+        axes = [int(ax) for ax in axis]
+    return ndarray(_squeeze(a, axes))
+
+
+@logger.catch(reraise=True)
+def expand_dims(a: ndarray, axis: int) -> ndarray:
+    """Insert a new axis of length one at `axis`."""
+    logger.debug(f"Expanding dims axis={axis}")
+    return ndarray(_expand_dims(a, axis))

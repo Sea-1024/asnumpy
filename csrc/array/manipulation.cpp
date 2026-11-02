@@ -173,4 +173,61 @@ NPUArray Stack(const std::vector<NPUArray>& arrays, int64_t axis) {
     return out;
 }
 
+NPUArray Squeeze(const NPUArray& array, const std::vector<int64_t>& axes) {
+    const int64_t ndim = static_cast<int64_t>(array.shape.size());
+
+    std::vector<int64_t> out_shape;
+    if (axes.empty()) {
+        // Drop every length-1 axis. A fully length-1 array squeezes to 0-d,
+        // matching numpy.squeeze rather than collapsing to shape (1,).
+        for (int64_t dim : array.shape) {
+            if (dim != 1) {
+                out_shape.push_back(dim);
+            }
+        }
+    } else {
+        std::vector<bool> drop(ndim, false);
+        for (int64_t axis : axes) {
+            const int64_t original = axis;
+            if (axis < 0) {
+                axis += ndim;
+            }
+            if (axis < 0 || axis >= ndim) {
+                throw std::invalid_argument(
+                    fmt::format("squeeze: axis {} is out of bounds for array of dimension {}", original, ndim));
+            }
+            if (drop[axis]) {
+                throw std::invalid_argument(fmt::format("squeeze: repeated axis {}", axis));
+            }
+            // NumPy refuses to squeeze a non-unit axis rather than silently
+            // leaving it in place, because that would change the result rank.
+            if (array.shape[axis] != 1) {
+                throw std::invalid_argument(
+                    fmt::format("squeeze: cannot select an axis to squeeze out which has size {} not equal to one",
+                                array.shape[axis]));
+            }
+            drop[axis] = true;
+        }
+        for (int64_t i = 0; i < ndim; ++i) {
+            if (!drop[i]) {
+                out_shape.push_back(array.shape[i]);
+            }
+        }
+    }
+
+    // Squeeze only relabels axes; the element order is unchanged, so this is a
+    // plain reshape over the same contiguous buffer.
+    return array.Reshape(out_shape);
+}
+
+NPUArray ExpandDims(const NPUArray& array, int64_t axis) {
+    // The new axis may land one past the last existing axis, hence ndim + 1.
+    const int64_t out_ndim = static_cast<int64_t>(array.shape.size()) + 1;
+    const int64_t norm_axis = NormalizeAxis(axis, out_ndim, "expand_dims");
+
+    std::vector<int64_t> out_shape = array.shape;
+    out_shape.insert(out_shape.begin() + norm_axis, 1);
+    return array.Reshape(out_shape);
+}
+
 } // namespace asnumpy

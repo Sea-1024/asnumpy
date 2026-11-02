@@ -50,4 +50,31 @@ NPUArray Concatenate(const std::vector<NPUArray>& arrays, int64_t axis);
  */
 NPUArray Stack(const std::vector<NPUArray>& arrays, int64_t axis);
 
+/**
+ * @brief Remove axes of length one.
+ *
+ * Mirrors numpy.squeeze. When `axes` is empty every length-1 axis is removed;
+ * otherwise only the named axes are, and each must actually have length 1.
+ *
+ * @param array Input array.
+ * @param axes Axes to remove, or empty for all length-1 axes. Negative wrap.
+ * @return NPUArray Newly allocated array with the axes removed.
+ * @throws std::invalid_argument If an axis is out of range, repeated, or does
+ *         not have length 1.
+ */
+NPUArray Squeeze(const NPUArray& array, const std::vector<int64_t>& axes);
+
+/**
+ * @brief Insert a new axis of length one.
+ *
+ * Mirrors numpy.expand_dims. The new axis may be placed one past the last
+ * existing axis, so valid positions are [-(ndim+1), ndim].
+ *
+ * @param array Input array.
+ * @param axis Position of the new axis. Negative values wrap.
+ * @return NPUArray Newly allocated array with one more dimension.
+ * @throws std::invalid_argument If `axis` is out of range.
+ */
+NPUArray ExpandDims(const NPUArray& array, int64_t axis);
+
 } // namespace asnumpy

@@ -46,6 +46,7 @@ print(result.to_numpy())
 <!-- toc -->
 
 - [Features](#features)
+- [Platform Support](#platform-support)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Performance](#performance)
@@ -65,6 +66,104 @@ print(result.to_numpy())
 - **Bidirectional data transfer** — `from_numpy()` and `to_numpy()` for seamless CPU↔NPU exchange
 - **Broadcasting support** — built-in `GetBroadcastShape()` follows NumPy broadcasting semantics
 - **Operator extensibility** — missing CANN operators are supplemented by [OpenBOAT](https://gitcode.com/HIT1920/OpenBOAT)
+
+## Platform Support
+
+> [!IMPORTANT]
+> **The Ascend NPU hardware available to this project is AArch64 only.** The full
+> test suite — the part that actually executes operators on the device — can only
+> run there. A portion of the suite cannot be validated on x86_64 at all.
+
+AsNumpy separates two things that are easy to conflate: **what can be built** and
+**what can be verified**.
+
+| | AArch64 + NPU | AArch64, no NPU | x86_64 |
+|---|---|---|---|
+| Compile `_core.so` | ✅ | ✅ | untested |
+| Import `asnumpy` | ✅ | ⚠️ see below | untested |
+| Lint, format, type-check | ✅ | ✅ | ✅ |
+| Device-independent tests | ✅ | ✅ | untested |
+| **Operator correctness tests** | ✅ | ❌ | ❌ |
+| Install the built wheel | ✅ | ✅ | ❌ wrong arch |
+
+The x86_64 column is marked *untested* deliberately: it requires an x86_64 CANN
+toolkit, which the maintainers' hardware cannot host. The build has no obvious
+architecture dependency, so it is expected to work — but nobody has run it, and
+this table does not claim results that were never produced.
+
+**Building needs no NPU.** The build links against `libascendcl` / `libnnopbase` /
+`libopapi` from the CANN toolkit; it never touches the driver and never opens a
+device. A CANN toolkit installation is sufficient to compile on a machine with no
+accelerator in it.
+
+**Importing without a device appears to succeed.** `import asnumpy` calls `init()`
+at module scope, and a failure there is swallowed by a `@logger.catch` decorator.
+The import therefore returns normally on a device-less machine and the failure only
+surfaces later, as a `CannError` from the first array operation. Do not read a
+successful import as evidence that a device is present.
+
+**Running operators needs an NPU.** Anything that reaches the device — which is
+the large majority of the suite — fails without one.
+
+> [!WARNING]
+> There is currently **no marker separating device-dependent tests from the rest**,
+> so on a machine without an NPU the device-backed tests report as *failures*, not
+> skips. A bare `pytest tests/` there produces a wall of red that says nothing about
+> your change. Until markers land, select test files explicitly:
+>
+> ```bash
+> # Passes with no NPU present — checks the built .so exports exactly one symbol
+> pytest tests/asnumpy_tests/interop_tests/test_symbol_visibility.py
+> ```
+
+Wheels are tagged `linux_aarch64` and will not install on x86_64. An x86_64 machine
+is useful for compile checks and static analysis, not for producing or consuming
+release artifacts.
+
+### What this means in practice
+
+- **Contributors without an Ascend machine** can still build, lint, and run the
+  device-independent tests, and that catches a real class of mistake. But a change
+  that touches an operator cannot be fully validated locally — expect the
+  device-backed review to be where correctness is actually established.
+- **Numerical results, performance claims, and operator coverage** in this
+  repository are established on AArch64 + Ascend 910B. No other configuration
+  reproduces them.
+
+### Planned: CPU-based build and packaging CI
+
+> [!NOTE]
+> **This describes intended work, not existing infrastructure.** There is no CI
+> pipeline in this repository yet. Nothing below is implemented, and none of it
+> should be read as a guarantee about current releases.
+
+The plan is to use CPU-only self-hosted runners for everything that does not need
+a device, keeping scarce Ascend hardware for correctness testing alone. Building
+requires only the CANN toolkit headers and link libraries, never the driver, so a
+CPU machine can compile and package the full extension.
+
+Intended scope:
+
+- **Daily builds** published as pre-release artifacts, covering **CPython 3.11
+  through 3.14** on both **x86_64 and AArch64** — eight wheels per run.
+- **`manylinux` wheels** rather than the bare `linux_*` tags produced today, so
+  installation does not depend on the builder's glibc.
+- **Linux only.** Windows and macOS are out of scope: CANN targets Linux, so a
+  wheel for either platform could never run.
+
+Known obstacles, recorded here so the work is not mistaken for a formality:
+
+| Obstacle | Why it blocks packaging |
+|---|---|
+| Version string carries a local segment | `setuptools-scm` yields e.g. `0.4.1.dev19+g6661f5461`; the `+…` suffix is a PEP 440 local identifier, which package indexes reject outright. |
+| `auditwheel` would bundle CANN | Repairing a wheel vendors its dependencies, but `libascendcl` and friends **must** come from the host's CANN installation. They need explicit exclusion, or wheels will ship a conflicting runtime. |
+| `manylinux` images lack CANN | CANN is not present in the standard build images and must be installed into them, which also fixes the CANN version a given wheel is built against. |
+| `fmt`/`spdlog` are system-only | `CMakeLists.txt` resolves both with `NO_DEFAULT_PATH` against distro paths, so build images must provide them — `FetchContent` is included but unused as a fallback. |
+| Python 3.10 vs the 3.11 floor | The project currently declares `requires-python = ">=3.10"`; a 3.11–3.14 matrix leaves 3.10 built by nobody. Either the floor moves or 3.10 joins the matrix. |
+
+Device-backed testing stays on Ascend hardware and is not part of this pipeline. A
+green daily build will therefore mean *"this commit compiles and packages cleanly"* —
+**not** *"this commit computes correctly."* The two must not be conflated.
 
 ## Installation
 

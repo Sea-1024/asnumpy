@@ -161,3 +161,34 @@ def test_reshape_rejects_two_minus_ones():
     a = _dev(numpy.arange(12).reshape(3, 4))
     with pytest.raises(ValueError):
         a.reshape((-1, -1))
+
+
+def test_memory_pool_serves_repeat_allocations_from_cache():
+    """The pool must actually hit, not just exist.
+
+    Timing alone cannot distinguish a working pool from one that never matches
+    a size; the counters can. A run of same-sized operations must be served
+    almost entirely from cache.
+    """
+    from asnumpy._core import memory_pool
+
+    a = _dev(numpy.ones((1000, 1000)))
+    before = memory_pool.stats()
+    for _ in range(50):
+        ap.multiply(a, a)
+    after = memory_pool.stats()
+
+    allocs = (after["hits"] + after["misses"]) - (before["hits"] + before["misses"])
+    hits = after["hits"] - before["hits"]
+    assert allocs >= 50, f"expected at least 50 allocations, saw {allocs}"
+    assert hits / allocs > 0.8, f"pool hit rate too low: {hits}/{allocs}"
+
+
+def test_memory_pool_clear_empties_the_cache():
+    from asnumpy._core import memory_pool
+
+    _dev(numpy.ones((500, 500)))  # populate
+    assert memory_pool.stats()["cached_bytes"] > 0
+
+    memory_pool.clear()
+    assert memory_pool.stats()["cached_bytes"] == 0

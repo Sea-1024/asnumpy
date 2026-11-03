@@ -17,6 +17,7 @@
 #include "asnumpy/utils/acl_resource.hpp"
 #include <acl/acl.h>
 #include <spdlog/spdlog.h>
+#include "asnumpy/utils/device_memory_pool.hpp"
 #include "asnumpy/utils/status_handler.hpp"
 
 namespace asnumpy {
@@ -27,15 +28,16 @@ namespace asnumpy {
 
 AclWorkspace::AclWorkspace(uint64_t size) : size_(size) {
     if (size_ > 0ULL) {
-        auto error = aclrtMalloc(&ptr_, size_, ACL_MEM_MALLOC_HUGE_FIRST);
-        ACL_RT_CHECK(error, "aclrtMalloc");
+        // Through the pool: workspaces are allocated and freed around every
+        // operator call, which is exactly the churn the pool exists to absorb.
+        ptr_ = DeviceMemoryPool::Allocate(static_cast<size_t>(size_));
         spdlog::info("AclWorkspace allocated {} bytes", size_);
     }
 }
 
 AclWorkspace::~AclWorkspace() {
     if (ptr_) {
-        aclrtFree(ptr_);
+        DeviceMemoryPool::Release(ptr_, static_cast<size_t>(size_));
     }
 }
 
@@ -48,7 +50,7 @@ AclWorkspace& AclWorkspace::operator=(AclWorkspace&& other) noexcept {
     if (this != &other) {
         // Free current resource
         if (ptr_) {
-            aclrtFree(ptr_);
+            DeviceMemoryPool::Release(ptr_, static_cast<size_t>(size_));
         }
         // Take ownership of other resource
         ptr_ = other.ptr_;

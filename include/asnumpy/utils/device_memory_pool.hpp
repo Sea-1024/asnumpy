@@ -68,10 +68,11 @@ class DeviceMemoryPool {
     static void Release(void* ptr, size_t bytes) noexcept;
 
     /**
-     * @brief Free every cached block back to the driver.
+     * @brief Free every cached block back to the driver and stop caching.
      *
-     * Must be called before aclrtResetDevice or aclFinalize; cached pointers do
-     * not survive either.
+     * Must be called before aclFinalize; cached pointers do not survive it.
+     * After this, Release() drops blocks instead of caching them, because a
+     * block freed once the runtime is gone has nothing left to free it with.
      */
     static void Clear() noexcept;
 

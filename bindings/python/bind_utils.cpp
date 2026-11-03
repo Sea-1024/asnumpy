@@ -15,6 +15,7 @@
  ******************************************************************************/
 
 #include <asnumpy/utils/cast.hpp>
+#include <asnumpy/utils/device_memory_pool.hpp>
 #include <asnumpy/utils/npu_array.hpp>
 #include <algorithm>
 #include <pybind11/pybind11.h>
@@ -109,4 +110,18 @@ void bind_utils(pybind11::module_& utils) {
             "T", [](const NPUArray& self) { return self.Transpose({}); },
             "The transposed array (all axes reversed)");
     utils.def("broadcast_shape", &GetBroadcastShape, py::arg("a"), py::arg("b"));
+
+    // Pool introspection. Hit/miss counts are what distinguish "the pool is
+    // working" from "every allocation still reaches the driver"; without them
+    // the only evidence of either is timing noise.
+    auto pool = utils.def_submodule("memory_pool", "Device memory pool statistics");
+    pool.def(
+        "stats",
+        []() {
+            return py::dict(py::arg("cached_bytes") = asnumpy::DeviceMemoryPool::CachedBytes(),
+                            py::arg("hits") = asnumpy::DeviceMemoryPool::HitCount(),
+                            py::arg("misses") = asnumpy::DeviceMemoryPool::MissCount());
+        },
+        "Current pool state: bytes held, allocations served from cache, and those that reached the driver.");
+    pool.def("clear", &asnumpy::DeviceMemoryPool::Clear, "Free cached blocks back to the driver.");
 }

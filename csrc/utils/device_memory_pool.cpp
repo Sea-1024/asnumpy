@@ -35,6 +35,9 @@ struct PoolState {
     size_t cached_bytes = 0;
     size_t hits = 0;
     size_t misses = 0;
+    // Set by Clear(). Once the CANN runtime has been torn down there is nothing
+    // left that can free a block, so Release() must drop rather than cache.
+    bool closed = false;
 };
 
 PoolState& state() {
@@ -89,6 +92,13 @@ void DeviceMemoryPool::Release(void* ptr, size_t bytes) noexcept {
     auto& s = state();
     std::lock_guard<std::mutex> lock(s.mutex);
 
+    // After Clear() the runtime may already be gone; calling aclrtFree would be
+    // at best a no-op and at worst a crash during interpreter shutdown. Leaking
+    // the block is the only safe option, and the process is ending anyway.
+    if (s.closed) {
+        return;
+    }
+
     // Evict largest-first until this block fits under the cap. Evicting by
     // descending size frees the most bytes per driver call.
     while (s.cached_bytes + bytes > kMaxCachedBytes && !s.free_lists.empty()) {
@@ -129,6 +139,7 @@ void DeviceMemoryPool::Clear() noexcept {
     }
     s.free_lists.clear();
     s.cached_bytes = 0;
+    s.closed = true;
 }
 
 size_t DeviceMemoryPool::CachedBytes() noexcept {

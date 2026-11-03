@@ -21,6 +21,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
+#include "asnumpy/utils/device_memory_pool.hpp"
 #include "asnumpy/utils/status_handler.hpp"
 #include "fmt/format.h"
 
@@ -81,6 +82,11 @@ void asnumpy::cann::init() {
 }
 
 void asnumpy::cann::finalize() {
+    // Drain the pool BEFORE aclFinalize. Cached blocks are owned by the pool, not
+    // by any live NPUArray, so nothing else would return them; leaving them
+    // cached means aclFinalize runs with device memory still held.
+    asnumpy::DeviceMemoryPool::Clear();
+
     auto ret = aclFinalize();
     if (ret != ACL_SUCCESS) {
         auto message = aclGetRecentErrMsg();

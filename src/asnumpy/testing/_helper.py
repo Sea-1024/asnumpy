@@ -208,13 +208,13 @@ def generate_test_data(func):
 
 # Common test constants
 TEST_SHAPES = [
-    (),          # scalar
-    (0,),        # empty array
-    (1,),        # single element
-    (5,),        # 1-D
-    (2, 3),      # 2-D
-    (2, 3, 4),   # 3-D
-    (1, 2, 3, 4),# 4-D
+    (),  # scalar
+    (0,),  # empty array
+    (1,),  # single element
+    (5,),  # 1-D
+    (2, 3),  # 2-D
+    (2, 3, 4),  # 3-D
+    (1, 2, 3, 4),  # 4-D
 ]
 
 TEST_DTYPES = [

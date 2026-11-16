@@ -17,11 +17,11 @@
 import gc
 import time
 
-import asnumpy as ap
 import numpy as np
 from loguru import logger
-
 from utils import calculate_stable_metric
+
+import asnumpy as ap
 
 
 def create_arrays(shape: tuple[int, ...], dtype: np.dtype):
@@ -84,22 +84,10 @@ def run_test_case(
 
     try:
         # --- Benchmark AsNumpy ---
-        asnp_times = bench_all(
-            ap.all,
-            m1_asnp,
-            warmup=warmup,
-            iterations=iterations,
-            is_npu=True
-        )
+        asnp_times = bench_all(ap.all, m1_asnp, warmup=warmup, iterations=iterations, is_npu=True)
 
         # --- Benchmark NumPy ---
-        np_times = bench_all(
-            np.all,
-            m1_np,
-            warmup=warmup,
-            iterations=iterations,
-            is_npu=False
-        )
+        np_times = bench_all(np.all, m1_np, warmup=warmup, iterations=iterations, is_npu=False)
 
         # Calculate statistics
         metric_asnp = calculate_stable_metric(asnp_times)
@@ -120,11 +108,11 @@ def run_test_case(
             logger.warning(f"Results differ (NumPy: {result_np}, AsNumpy: {result_asnp})")
 
         return {
-            'shape': shape,
-            'dtype': str(dtype),
-            'asnumpy_metric': metric_asnp,
-            'numpy_metric': metric_np,
-            'speedup': speedup,
+            "shape": shape,
+            "dtype": str(dtype),
+            "asnumpy_metric": metric_asnp,
+            "numpy_metric": metric_np,
+            "speedup": speedup,
         }
 
     finally:
@@ -137,7 +125,9 @@ if __name__ == "__main__":
     logger.info("=" * 70)
     logger.info("README example code performance benchmark")
     logger.info("Test operation: all (reduction - check if all elements are True)")
-    logger.info("Statistics strategy: after warmup, take mid-segment fastest speed (exclude slowest 10%)")
+    logger.info(
+        "Statistics strategy: after warmup, take mid-segment fastest speed (exclude slowest 10%)"
+    )
     logger.info("=" * 70)
 
     # Test configuration - multiple shapes and data types
@@ -170,20 +160,23 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"Test failed: {e}")
             import traceback
+
             traceback.print_exc()
 
     # Output summary results
     print("\n" + "=" * 95)
     print("Test results summary (based on mid-segment fastest speed)")
     print("-" * 95)
-    print(f"{'Shape':<15} | {'Type':<10} | {'Data Size':<12} | {'AsNumpy':<12} | {'NumPy':<12} | {'Speedup':<10}")
+    print(
+        f"{'Shape':<15} | {'Type':<10} | {'Data Size':<12} | {'AsNumpy':<12} | {'NumPy':<12} | {'Speedup':<10}"
+    )
     print(f"{'':15} | {'':10} | {'':12} | {'(ms)':<12} | {'(ms)':<12} | {'':10}")
     print("-" * 95)
 
     for result in results:
-        shape_str = str(result['shape'])
-        dtype_str = result['dtype']
-        data_size = np.prod(result['shape'])
+        shape_str = str(result["shape"])
+        dtype_str = result["dtype"]
+        data_size = np.prod(result["shape"])
         data_size_str = f"{data_size:,}"
         asnp_time = f"{result['asnumpy_metric'] * 1000:.4f}"
         np_time = f"{result['numpy_metric'] * 1000:.4f}"
@@ -198,8 +191,8 @@ if __name__ == "__main__":
 
     # Statistics
     if results:
-        avg_speedup = sum(r['speedup'] for r in results) / len(results)
-        max_speedup = max(r['speedup'] for r in results)
+        avg_speedup = sum(r["speedup"] for r in results) / len(results)
+        max_speedup = max(r["speedup"] for r in results)
 
         logger.info(f"\n{'=' * 70}")
         logger.info("Performance statistics:")
@@ -211,5 +204,7 @@ if __name__ == "__main__":
     logger.info("  • Testing both bool and float32 data types")
     logger.info("  • all() is a reduction operation that returns a scalar result")
     logger.info("  • Iterations adjusted to ensure memory safety")
-    logger.info("  • Uses 'mid-segment fastest speed' algorithm to showcase NPU's true compute capability")
+    logger.info(
+        "  • Uses 'mid-segment fastest speed' algorithm to showcase NPU's true compute capability"
+    )
     logger.info("=" * 70)

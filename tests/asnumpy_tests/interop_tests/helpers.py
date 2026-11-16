@@ -31,13 +31,9 @@ def assert_numpy_equal(actual, expected):
     actual_np = to_numpy(actual)
     expected_np = np.asarray(expected)
     if actual_np.shape != expected_np.shape:
-        raise AssertionError(
-            f"shape mismatch: {actual_np.shape} != {expected_np.shape}"
-        )
+        raise AssertionError(f"shape mismatch: {actual_np.shape} != {expected_np.shape}")
     if actual_np.dtype != expected_np.dtype:
-        raise AssertionError(
-            f"dtype mismatch: {actual_np.dtype} != {expected_np.dtype}"
-        )
+        raise AssertionError(f"dtype mismatch: {actual_np.dtype} != {expected_np.dtype}")
     np.testing.assert_array_equal(actual_np, expected_np)
 
 
@@ -45,11 +41,7 @@ def assert_numpy_allclose(actual, expected, *, rtol=1e-6, atol=1e-6):
     actual_np = to_numpy(actual)
     expected_np = np.asarray(expected)
     if actual_np.shape != expected_np.shape:
-        raise AssertionError(
-            f"shape mismatch: {actual_np.shape} != {expected_np.shape}"
-        )
+        raise AssertionError(f"shape mismatch: {actual_np.shape} != {expected_np.shape}")
     if actual_np.dtype != expected_np.dtype:
-        raise AssertionError(
-            f"dtype mismatch: {actual_np.dtype} != {expected_np.dtype}"
-        )
+        raise AssertionError(f"dtype mismatch: {actual_np.dtype} != {expected_np.dtype}")
     np.testing.assert_allclose(actual_np, expected_np, rtol=rtol, atol=atol, equal_nan=True)

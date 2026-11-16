@@ -251,6 +251,7 @@ class TestCreateUfunc:
     @staticmethod
     def test_create_ufunc_with_fallback():
         """create_ufunc stores fallback on the ufunc."""
+
         def fallback(x):
             return x
 
@@ -341,7 +342,6 @@ class TestUfuncCorrectness:
         result = anp.equal(a, b)
         expected = numpy.array([True, False, True])
         numpy.testing.assert_array_equal(result.to_numpy(), expected)
-
 
 
 class TestArrayUfuncProtocol:
@@ -495,7 +495,7 @@ class TestWeakScalar:
     @staticmethod
     def test_ufunc_coerces_scalar_dtype():
         """Verify that weak scalar changes in_dtypes before dispatch."""
-        u = create_ufunc(
+        create_ufunc(
             "test_ws",
             (("f->f", lambda x: x), ("d->d", lambda x: x)),
         )
@@ -511,14 +511,14 @@ class TestWeakScalar:
     def test_ufunc_int_scalar_kind_le_float():
         """int kind (1) <= float32 kind (2), so coercion happens."""
         arr = numpy.array([1.0], dtype=numpy.float32)
-        scalar_dtype = numpy.dtype(type(3))  # int -> int64
+        scalar_dtype = numpy.dtype(int)  # int -> int64
         assert _dtype_kind(scalar_dtype) <= _dtype_kind(arr.dtype)
 
     @staticmethod
     def test_ufunc_float_scalar_kind_eq_float():
         """float kind (2) == float32 kind (2), so coercion happens."""
         arr = numpy.array([1.0], dtype=numpy.float32)
-        scalar_dtype = numpy.dtype(type(0.5))  # float -> float64
+        scalar_dtype = numpy.dtype(float)  # float -> float64
         assert _dtype_kind(scalar_dtype) == _dtype_kind(arr.dtype)
 
     @staticmethod

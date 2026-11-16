@@ -17,16 +17,23 @@
 import gc
 import time
 
-import asnumpy as ap
 import numpy as np
 from loguru import logger
-
 from utils import calculate_stable_metric
 
+import asnumpy as ap
 
-def bench_linspace(linspace_func, start: float, end: float, steps: int,
-                   dtype: np.dtype, warmup: int, iterations: int,
-                   is_npu: bool = False) -> list:
+
+def bench_linspace(
+    linspace_func,
+    start: float,
+    end: float,
+    steps: int,
+    dtype: np.dtype,
+    warmup: int,
+    iterations: int,
+    is_npu: bool = False,
+) -> list:
     """
     Benchmark function for linspace operation.
     Memory-optimized: explicitly delete intermediate variables to avoid OOM.
@@ -56,9 +63,14 @@ def bench_linspace(linspace_func, start: float, end: float, steps: int,
     return times
 
 
-def run_test_case(steps: int, start: float = 0.0, end: float = 100.0,
-                  dtype: np.dtype = np.float32,
-                  warmup: int = 40, iterations: int = 400) -> dict[str, float]:
+def run_test_case(
+    steps: int,
+    start: float = 0.0,
+    end: float = 100.0,
+    dtype: np.dtype = np.float32,
+    warmup: int = 40,
+    iterations: int = 400,
+) -> dict[str, float]:
     """Run a single test case"""
     logger.info(f"{'=' * 50}")
     logger.info(f"Test steps: {steps:,} (range: [{start}, {end}])")
@@ -66,20 +78,19 @@ def run_test_case(steps: int, start: float = 0.0, end: float = 100.0,
     try:
         # --- Benchmark AsNumpy ---
         asnp_times = bench_linspace(
-            ap.linspace,
-            start, end, steps, dtype,
-            warmup=warmup,
-            iterations=iterations,
-            is_npu=True
+            ap.linspace, start, end, steps, dtype, warmup=warmup, iterations=iterations, is_npu=True
         )
 
         # --- Benchmark NumPy ---
         np_times = bench_linspace(
             np.linspace,
-            start, end, steps, dtype,
+            start,
+            end,
+            steps,
+            dtype,
             warmup=warmup,
             iterations=iterations,
-            is_npu=False
+            is_npu=False,
         )
 
         # Calculate statistics
@@ -96,21 +107,24 @@ def run_test_case(steps: int, start: float = 0.0, end: float = 100.0,
         rel_diff = max_diff / max_val if max_val > 0 else max_diff
 
         if rel_diff < 1e-4:
-            logger.info(f"Verification passed: results are consistent (relative diff: {rel_diff:.2e})")
+            logger.info(
+                f"Verification passed: results are consistent (relative diff: {rel_diff:.2e})"
+            )
         else:
             logger.warning(f"Results differ (max relative diff: {rel_diff:.2e})")
 
         return {
-            'steps': steps,
-            'asnumpy_metric': metric_asnp,
-            'numpy_metric': metric_np,
-            'speedup': speedup,
-            'relative_diff': rel_diff
+            "steps": steps,
+            "asnumpy_metric": metric_asnp,
+            "numpy_metric": metric_np,
+            "speedup": speedup,
+            "relative_diff": rel_diff,
         }
 
     except Exception as e:
         logger.error(f"Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return None
     finally:
@@ -122,15 +136,17 @@ if __name__ == "__main__":
     logger.info("=" * 70)
     logger.info("README example code performance benchmark")
     logger.info("Test operation: linspace (create evenly spaced sequence)")
-    logger.info("Statistics strategy: after warmup, take mid-segment fastest speed (exclude slowest 10%)")
+    logger.info(
+        "Statistics strategy: after warmup, take mid-segment fastest speed (exclude slowest 10%)"
+    )
     logger.info("=" * 70)
 
     # Test configuration - step counts correspond to data sizes of other examples
     test_steps = [
-        250000,     # Corresponds to (500, 500) data size
-        1000000,    # Corresponds to (1000, 1000) data size
-        4000000,    # Corresponds to (2000, 2000) data size
-        9000000,    # Corresponds to (3000, 3000) data size
+        250000,  # Corresponds to (500, 500) data size
+        1000000,  # Corresponds to (1000, 1000) data size
+        4000000,  # Corresponds to (2000, 2000) data size
+        9000000,  # Corresponds to (3000, 3000) data size
     ]
     dtype = np.dtype(np.float32)
     start_val = 0.0
@@ -151,8 +167,7 @@ if __name__ == "__main__":
 
     results = []
     for steps in test_steps:
-        result = run_test_case(steps, start_val, end_val, dtype,
-                               warmup_iterations, test_iterations)
+        result = run_test_case(steps, start_val, end_val, dtype, warmup_iterations, test_iterations)
         if result is not None:
             results.append(result)
 
@@ -168,14 +183,16 @@ if __name__ == "__main__":
         np_time = f"{result['numpy_metric'] * 1000:.4f}"
         speedup_str = f"{result['speedup']:.2f}x"
 
-        print(f"{steps_str:<15} | {data_size_str:<12} | {asnp_time:<12} | {np_time:<12} | {speedup_str}")
+        print(
+            f"{steps_str:<15} | {data_size_str:<12} | {asnp_time:<12} | {np_time:<12} | {speedup_str}"
+        )
 
     print("-" * 85)
 
     # Statistics
     if results:
-        avg_speedup = sum(r['speedup'] for r in results) / len(results)
-        max_speedup = max(r['speedup'] for r in results)
+        avg_speedup = sum(r["speedup"] for r in results) / len(results)
+        max_speedup = max(r["speedup"] for r in results)
 
         logger.info(f"\n{'=' * 70}")
         logger.info("Performance statistics:")
@@ -187,5 +204,7 @@ if __name__ == "__main__":
     logger.info("  • Using float32 data type for NPU compatibility")
     logger.info("  • linspace generates evenly spaced 1D array within specified range")
     logger.info("  • Iterations adjusted to ensure memory safety")
-    logger.info("  • Uses 'mid-segment fastest speed' algorithm to showcase NPU's true compute capability")
+    logger.info(
+        "  • Uses 'mid-segment fastest speed' algorithm to showcase NPU's true compute capability"
+    )
     logger.info("=" * 70)

@@ -286,9 +286,9 @@ def _sin_fallback(x, dtype=None):
 
 
 sin = _create_ufunc(
-    'sin',
-    (('f->f', _sin, False), ('e->e', _sin, False), ('d->d', _sin, False)),
-    doc='Compute sine element-wise.',
+    "sin",
+    (("f->f", _sin, False), ("e->e", _sin, False), ("d->d", _sin, False)),
+    doc="Compute sine element-wise.",
     fallback=_sin_fallback,
 )
 
@@ -390,10 +390,10 @@ def _add_fallback(x1, x2, dtype=None):
 
 
 add = _create_ufunc(
-    'add',
-    (('ff->f', _add), ('dd->d', _add)),
+    "add",
+    (("ff->f", _add), ("dd->d", _add)),
     fallback=_add_fallback,
-    doc='Add arguments element-wise.',
+    doc="Add arguments element-wise.",
 )
 
 
@@ -411,9 +411,9 @@ def _negative_fallback(x, dtype=None):
 
 
 negative = _create_ufunc(
-    'negative',
-    (('f->f', _negative), ('d->d', _negative), ('i->i', _negative)),
-    doc='Numerical negative, element-wise.',
+    "negative",
+    (("f->f", _negative), ("d->d", _negative), ("i->i", _negative)),
+    doc="Numerical negative, element-wise.",
     fallback=_negative_fallback,
 )
 

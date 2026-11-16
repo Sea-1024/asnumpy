@@ -193,8 +193,7 @@ def _parse_loop_table(loop_table, nin: int, nout: int) -> list[Op]:
                     )
                 if len(out_dtypes) != nout:
                     raise ValueError(
-                        f"Type signature {sig!r} has {len(out_dtypes)} outputs, "
-                        f"expected {nout}"
+                        f"Type signature {sig!r} has {len(out_dtypes)} outputs, expected {nout}"
                     )
                 ops.append(Op(in_dtypes, out_dtypes, routine, accepts_dtype=accepts_dtype))
             else:
@@ -303,8 +302,7 @@ class ufunc:
 
         if kwargs:
             raise TypeError(
-                f"ufunc '{self.name}() got unexpected keyword argument(s): "
-                f"{', '.join(kwargs)}"
+                f"ufunc '{self.name}() got unexpected keyword argument(s): {', '.join(kwargs)}"
             )
 
         # Extract dtypes from inputs
@@ -351,9 +349,7 @@ class ufunc:
 
         # Call the core routine
         if dtype is not None and not op.accepts_dtype:
-            raise TypeError(
-                f"ufunc '{self.name}' does not support the 'dtype' parameter"
-            )
+            raise TypeError(f"ufunc '{self.name}' does not support the 'dtype' parameter")
         if op.accepts_dtype:
             result = op.routine(*processed_args, dtype)
         else:

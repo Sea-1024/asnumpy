@@ -66,8 +66,7 @@ NPUArray Linalg_Inv(const NPUArray& a) {
     // under float noise, so also treat tiny |det| (via logabsdet) as singular.
     auto [sign, logdet] = Linalg_Slogdet(a);
     if (IsNumericallySingular(sign, logdet)) {
-        throw std::runtime_error(
-            "Singular matrix: inv() failed because the matrix is singular (LinAlgError)");
+        throw std::runtime_error("Singular matrix: inv() failed because the matrix is singular (LinAlgError)");
     }
 
     return EXECUTE_UNARY_OP(

@@ -14,12 +14,11 @@
 # limitations under the License.
 # *****************************************************************************
 
+
 import numpy as np
 
-from typing import Tuple
 
-
-def create_arrays(shape: Tuple[int, ...], dtype: np.dtype):
+def create_arrays(shape: tuple[int, ...], dtype: np.dtype):
     """创建asnumpy和numpy测试数组"""
     # numpy 基准数据
     m1_np = np.random.normal(0, 1, shape).astype(dtype)
@@ -27,6 +26,7 @@ def create_arrays(shape: Tuple[int, ...], dtype: np.dtype):
 
     # asnumpy测试数据 - 从 numpy 转换
     import asnumpy as ap
+
     m1_asnp = ap.ndarray.from_numpy(m1_np)
     m2_asnp = ap.ndarray.from_numpy(m2_np)
 
